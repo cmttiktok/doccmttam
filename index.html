@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BÈO CONTROL PANEL - NÂNG CẤP</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght=600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --pink: #fe2c55; 
+            --neon: #ff0055;
+            --bg: #fff0f3; 
+            --panel: #ffffff; 
+            --system-msg: #2ecc71; /* Xanh lá cho hệ thống */
+        }
+        
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: 'Quicksand', sans-serif; 
+            background: var(--bg); 
+            margin: 0; padding: 15px; 
+            display: flex; flex-direction: column; align-items: center; /* Giao diện 1 cột thẳng */
+            gap: 15px;
+        }
+
+        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
+
+        /* NEON GLASS CARD */
+        .card { 
+            background: var(--panel); padding: 20px; border-radius: 20px; 
+            border: 2px solid #fff; box-shadow: 0 8px 25px rgba(254, 44, 85, 0.1);
+            position: relative; overflow: hidden;
+        }
+
+        /* WIDGETS ĐỒNG HỒ & LỊCH */
+        .widgets { text-align: center; background: white; border: 2px solid var(--pink); box-shadow: 0 0 15px rgba(254, 44, 85, 0.2); }
+        #clock { font-size: 32px; font-weight: 700; color: var(--pink); text-shadow: 0 0 10px rgba(254, 44, 85, 0.3); }
+        #date-container { font-size: 14px; color: #666; font-weight: bold; margin-top: 5px; }
+        .lunar-txt { color: #d63384; }
+
+        /* Ô CHAT KHÓA 12 DÒNG (Khoảng 450px - 500px) */
+        .chat-card { height: 580px; display: flex; flex-direction: column; }
+        #chat { 
+            flex: 1; overflow-y: auto; 
+            display: flex; flex-direction: column; /* Tin mới ở dưới cùng */
+            scrollbar-width: thin;
+        }
+        #chat::-webkit-scrollbar { width: 5px; }
+        #chat::-webkit-scrollbar-thumb { background: var(--pink); border-radius: 10px; }
+
+        .msg { padding: 10px; border-bottom: 1px solid #fdf0f2; font-size: 15px; line-height: 1.4; word-break: break-word; }
+        .msg.system { color: var(--system-msg); font-weight: bold; }
+        .msg.user { color: var(--pink); }
+
+        /* KẾT NỐI */
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--pink); box-shadow: 0 0 10px rgba(254, 44, 85, 0.2); }
+        
+        button.conn-btn { 
+            width: 100%; padding: 12px; background: var(--pink); color: white; border: none; 
+            border-radius: 12px; font-weight: bold; cursor: pointer; 
+            box-shadow: 0 4px 15px rgba(254, 44, 85, 0.3); transition: 0.3s;
+        }
+
+        /* SWITCH NÂNG CẤP */
+        .sw-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9f9f9; font-size: 13px; font-weight: bold; }
+        .switch { position: relative; width: 42px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ddd; border-radius: 30px; transition: .4s; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .4s; }
+        input:checked + .slider { background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+        input:checked + .slider:before { transform: translateX(18px); }
+
+        /* THANH ÂM LƯỢNG & TỐC ĐỘ */
+        .control-box { margin-top: 10px; font-size: 12px; background: #fdf2f4; padding: 12px; border-radius: 15px; border: 1px solid #fff; }
+        input[type="range"] { width: 100%; accent-color: var(--pink); margin-top: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card widgets">
+        <div id="clock">00:00:00</div>
+        <div id="date-container">
+            <span id="date-solar">Đang tải...</span> | <span class="lunar-txt" id="date-lunar">...</span>
+        </div>
+    </div>
+
+    <div class="card" style="border: 2px solid var(--pink);">
+        <input type="text" id="user" placeholder="Nhập ID TikTok của bạn...">
+        <button class="conn-btn" id="btnConn" onclick="start()">KẾT NỐI LIVE</button>
+        <div id="stt" style="font-size: 11px; text-align: center; margin-top: 8px; color: #999; font-weight: bold;">Trạng thái: Đang chờ...</div>
+    </div>
+
+    <div class="card chat-card">
+        <h3 style="margin: 0 0 10px 0; color: var(--pink); font-size: 16px; border-bottom: 2px solid var(--bg); padding-bottom: 5px;">BÌNH LUẬN TRỰC TIẾP</h3>
+        <div id="chat"></div>
+    </div>
+
+    <div class="card">
+        <div class="sw-item"><span>Tắt tiếng hệ thống:</span><label class="switch"><input type="checkbox" id="masterMute"><span class="slider"></span></label></div>
+        <div class="sw-item"><span>Ẩn cmt hệ thống:</span><label class="switch"><input type="checkbox" id="hideSystem"><span class="slider"></span></label></div>
+        <div class="sw-item"><span>Chào khách:</span><label class="switch"><input type="checkbox" id="welcomeToggle" checked><span class="slider"></span></label></div>
+        <div class="sw-item"><span>Đọc Quà:</span><label class="switch"><input type="checkbox" id="giftToggle" checked><span class="slider"></span></label></div>
+        <div class="sw-item"><span>Nhắc PK:</span><label class="switch"><input type="checkbox" id="pkToggle" checked><span class="slider"></span></label></div>
+        <div class="sw-item"><span>Trợ lý:</span><label class="switch"><input type="checkbox" id="botToggle" checked><span class="slider"></span></label></div>
+
+        <div class="control-box">
+            <b>TỐC ĐỘ ĐỌC: <span id="speedVal" style="color:var(--pink)">1.0</span>x</b>
+            <input type="range" id="speechSpeed" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('speedVal').innerText=this.value">
+        </div>
+        <div class="control-box">
+            <b>ÂM LƯỢNG: <span id="volVal" style="color:var(--pink)">100</span>%</b>
+            <input type="range" id="masterVolume" min="0" max="1" step="0.1" value="1" oninput="document.getElementById('volVal').innerText=Math.round(this.value*100)">
+        </div>
+    </div>
+
+    <a href="/admin" target="_blank" style="color:var(--pink); text-align:center; display:block; font-size:12px; text-decoration:none; font-weight:bold; margin-bottom: 20px;">⚙️ QUẢN LÝ DỮ LIỆU</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/moment/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment/locale/vi.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-lunar/moment-lunar.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
+
+<script>
+    const socket = io();
+    let queue = [], playing = false;
+    const noSleep = new NoSleep(); // Khởi tạo NoSleep
+
+    // KHỞI TẠO BỘ NHỚ THEO DÕI SPAM (Lưu tạm thời trong phiên live)
+    const bieuDoSpam = {};
+    const danhSachChanSpam = new Set();
+
+    // Hàm phân tích xem nội dung có chứa chuỗi ký tự lặp lại hoặc quá tải icon hay không
+    function kiemTraNoiDungSpam(text) {
+        if (!text) return false;
+        // Kiểm tra lặp ký tự (ví dụ: "aaaaa") hoặc lặp từ ngữ liên tiếp
+        const lapKyTu = /(.)\1{4,}/gi;
+        const lapTuNgu = /(\b\w+\b)(.*\1){3,}/gi;
+        // Kiểm tra quá 5 emoji/icon trong câu
+        const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}]/gu;
+        const soLuongIcon = (text.match(emojiRegex) || []).length;
+
+        return lapKyTu.test(text) || lapTuNgu.test(text) || soLuongIcon > 5;
+    }
+
+    // Cập nhật đồng hồ và lịch
+    moment.locale('vi');
+    function updateTime() {
+        const now = moment();
+        document.getElementById('clock').innerText = now.format('HH:mm:ss');
+        document.getElementById('date-solar').innerText = now.format('dddd, DD/MM/YYYY');
+        document.getElementById('date-lunar').innerText = `Âm lịch: ${now.lunar().format('DD/MM')}`;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // Tự động kết nối lại khi mất mạng
+    socket.on('disconnect', () => {
+        document.getElementById('stt').innerText = "Mất kết nối server, đang thử lại...";
+        document.getElementById('stt').style.color = "red";
+    });
+
+    function start() {
+        const u = document.getElementById('user').value;
+        if(u) {
+            // Kích hoạt giữ sáng màn hình khi người dùng bấm nút (Bắt buộc phải có tương tác người dùng)
+            noSleep.enable();
+            console.log("Màn hình sẽ luôn sáng...");
+
+            socket.emit('set-username', u);
+            document.getElementById('stt').innerText = "Đang kết nối đến: " + u;
+        }
+    }
+
+    socket.on('status', m => {
+        document.getElementById('stt').innerText = m;
+        if (m.includes("Đã kết nối")) {
+            document.getElementById('btnConn').innerText = "ĐÃ KẾT NỐI THÀNH CÔNG";
+            document.getElementById('btnConn').style.background = "#2ecc71";
+            document.getElementById('btnConn').style.boxShadow = "0 0 15px #2ecc71";
+        }
+    });
+
+    socket.on('audio-data', d => {
+        const isSystem = ['welcome', 'gift', 'pk', 'bot'].includes(d.type);
+        
+        // 1. KIỂM TRA BLOCK: Nếu user nằm trong danh sách chặn spam -> Bỏ qua hoàn toàn, không đọc, không in chat
+        if (d.user && danhSachChanSpam.has(d.user)) {
+            return;
+        }
+
+        // 2. XỬ LÝ CHECK SPAM: Chỉ check comment thường từ người dùng thực tế
+        if (!isSystem && d.type === 'comment' && d.user) {
+            if (kiemTraNoiDungSpam(d.comment)) {
+                if (!bieuDoSpam[d.user]) {
+                    bieuDoSpam[d.user] = 0;
+                }
+                bieuDoSpam[d.user]++;
+
+                // Nhắc nhở khi chạm mốc 3 lần cố tình spam
+                if (bieuDoSpam[d.user] === 3) {
+                    // Chèn thông báo cảnh báo trực quan vào khung chat
+                    const chat = document.getElementById('chat');
+                    const divWarning = document.createElement('div');
+                    divWarning.className = 'msg system';
+                    divWarning.style.color = '#ff9800'; // Màu cam cảnh báo
+                    divWarning.innerHTML = `⚠️ <b>HỆ THỐNG:</b> User <b>${d.user}</b> đang spam, dừng đọc comment từ người này!`;
+                    chat.appendChild(divWarning);
+                    chat.scrollTop = chat.scrollHeight;
+
+                    // Đưa thẳng vào danh sách chặn cho đến khi kết thúc phiên live (F5)
+                    danhSachChanSpam.add(d.user);
+                }
+            }
+        }
+        
+        if (!(isSystem && document.getElementById('hideSystem').checked)) {
+            const chat = document.getElementById('chat');
+            const div = document.createElement('div');
+            div.className = `msg ${isSystem ? 'system' : 'user'}`;
+            
+            div.innerHTML = `<b>${d.user}:</b> ${d.comment}`;
+            
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight; 
+
+            if (chat.childNodes.length > 50) chat.removeChild(chat.firstChild);
+        }
+
+        if (d.audio && !document.getElementById('masterMute').checked) {
+            if (d.type === 'welcome' && !document.getElementById('welcomeToggle').checked) return;
+            if (d.type === 'gift' && !document.getElementById('giftToggle').checked) return;
+            if (d.type === 'pk' && !document.getElementById('pkToggle').checked) return;
+            if (d.type === 'bot' && !document.getElementById('botToggle').checked) return;
+            
+            queue.push(d.audio);
+            if (!playing) play();
+        }
+    });
+
+    function play() {
+        if (!queue.length) { playing = false; return; }
+        playing = true;
+        const a = new Audio(queue.shift());
+        a.playbackRate = parseFloat(document.getElementById('speechSpeed').value);
+        a.volume = parseFloat(document.getElementById('masterVolume').value);
+        a.onended = () => setTimeout(play, 300);
+        a.play().catch(() => play());
+    }
+</script>
+</body>
+</html>
