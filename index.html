@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BÈO LIVE COMMENTS</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght=600;700&display=swap" rel="stylesheet">
     <style>
         :root { 
             --pink: #fe2c55; 
@@ -25,13 +25,11 @@
 
         .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
 
-        /* NEON GLASS CARD */
         .card { 
             background: var(--panel); padding: 20px; border-radius: 20px; 
             border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254, 44, 85, 0.1);
         }
 
-        /* KHUNG CHAT HIỂN THỊ LỚN TỐI ƯU */
         .chat-card { height: 650px; display: flex; flex-direction: column; }
         #chat { 
             flex: 1; overflow-y: auto; 
@@ -44,7 +42,6 @@
         .msg { padding: 12px; border-bottom: 1px solid #fdf0f2; font-size: 16px; line-height: 1.4; word-break: break-word; }
         .msg b { color: var(--pink); }
 
-        /* INPUT VÀ NÚT KẾT NỐI */
         input[type="text"] { width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; outline: none; font-family: inherit; font-size: 15px; }
         input:focus { border-color: var(--pink); box-shadow: 0 0 10px rgba(254, 44, 85, 0.2); }
         
@@ -73,9 +70,9 @@
 </div>
 
 <script>
-    const socket = io();
+    // ĐÃ SỬA: Cấu hình transports tránh lỗi chặn kết nối mạng
+    const socket = io({ transports: ['websocket', 'polling'] });
 
-    // Tự động báo trạng thái kết nối server mạng
     socket.on('disconnect', () => {
         const sttBox = document.getElementById('stt');
         sttBox.innerText = "Mất kết nối server, đang thử lại...";
@@ -103,12 +100,11 @@
             btn.style.boxShadow = "0 0 15px #2ecc71";
         } else if (m.includes("thất bại")) {
             sttBox.style.color = "red";
-            btn.style.background = var(--pink);
+            btn.style.background = "#fe2c55";
             btn.innerText = "KẾT NỐI LIVE";
         }
     });
 
-    // Nhận và in comment siêu tốc
     socket.on('comment-data', d => {
         const chat = document.getElementById('chat');
         const div = document.createElement('div');
@@ -116,9 +112,8 @@
         div.innerHTML = `<b>${d.user}:</b> ${d.comment}`;
         
         chat.appendChild(div);
-        chat.scrollTop = chat.scrollHeight; // Luôn cuộn xuống comment mới nhất
+        chat.scrollTop = chat.scrollHeight;
 
-        // Giới hạn giữ lại tối đa 100 comment trên màn hình để tránh giật lag trình duyệt
         if (chat.childNodes.length > 100) {
             chat.removeChild(chat.firstChild);
         }
