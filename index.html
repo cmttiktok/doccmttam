@@ -25,11 +25,13 @@
 
         .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
 
+        /* NEON GLASS CARD */
         .card { 
             background: var(--panel); padding: 20px; border-radius: 20px; 
             border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254, 44, 85, 0.1);
         }
 
+        /* KHUNG CHAT HIỂN THỊ LỚN TỐI ƯU CHO MOBILE */
         .chat-card { height: 650px; display: flex; flex-direction: column; }
         #chat { 
             flex: 1; overflow-y: auto; 
@@ -42,6 +44,7 @@
         .msg { padding: 12px; border-bottom: 1px solid #fdf0f2; font-size: 16px; line-height: 1.4; word-break: break-word; }
         .msg b { color: var(--pink); }
 
+        /* INPUT VÀ NÚT KẾT NỐI */
         input[type="text"] { width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; outline: none; font-family: inherit; font-size: 15px; }
         input:focus { border-color: var(--pink); box-shadow: 0 0 10px rgba(254, 44, 85, 0.2); }
         
@@ -70,8 +73,25 @@
 </div>
 
 <script>
-    // ĐÃ SỬA: Cấu hình transports tránh lỗi chặn kết nối mạng
+    // Cấu hình kết nối WebSocket ưu tiên giúp Socket.io bắt tay nhanh không lag
     const socket = io({ transports: ['websocket', 'polling'] });
+
+    // Biến toàn cục để quản lý trạng thái giữ sáng màn hình
+    let wakeLock = null;
+
+    // Hàm gọi API đánh thức hệ thống giữ sáng màn hình
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('🔒 Đã kích hoạt Wake Lock: Màn hình sẽ luôn sáng liên tục!');
+            } else {
+                console.log('⚠️ Trình duyệt này không hỗ trợ tự động giữ sáng.');
+            }
+        } catch (err) {
+            console.log(`❌ Lỗi giữ sáng màn hình: ${err.name}, ${err.message}`);
+        }
+    }
 
     socket.on('disconnect', () => {
         const sttBox = document.getElementById('stt');
@@ -85,6 +105,9 @@
             socket.emit('set-username', u);
             document.getElementById('stt').innerText = "Đang kết nối đến: " + u;
             document.getElementById('stt').style.color = "#999";
+            
+            // Kích hoạt tính năng giữ sáng màn hình ngay khi người dùng bấm kết nối
+            requestWakeLock();
         }
     }
 
@@ -105,6 +128,7 @@
         }
     });
 
+    // Nhận dữ liệu bình luận từ Server và hiển thị siêu tốc
     socket.on('comment-data', d => {
         const chat = document.getElementById('chat');
         const div = document.createElement('div');
@@ -112,10 +136,18 @@
         div.innerHTML = `<b>${d.user}:</b> ${d.comment}`;
         
         chat.appendChild(div);
-        chat.scrollTop = chat.scrollHeight;
+        chat.scrollTop = chat.scrollHeight; // Tự động cuộn xuống dưới cùng để xem cmt mới nhất
 
+        // Giới hạn hiển thị tối đa 100 comment trên màn hình điện thoại để tránh giật lag máy
         if (chat.childNodes.length > 100) {
             chat.removeChild(chat.firstChild);
+        }
+    });
+
+    // Tự động kích hoạt lại giữ sáng nếu người dùng vô tình ẩn tab/khóa màn hình rồi mở lại trang web
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            await requestWakeLock();
         }
     });
 </script>
