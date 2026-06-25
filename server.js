@@ -21,8 +21,25 @@ io.on('connection', (socket) => {
         }
 
         try {
-            // Nạp động thư viện để lấy chính xác Constructor bất kể cấu trúc đóng gói nào
-            const { WebcastPushConnection } = await import('tiktok-live-connector');
+            // Nạp động module
+            const importedModule = await import('tiktok-live-connector');
+            
+            // Giải mã chuẩn xác Constructor bất kể thư viện đóng gói kiểu gì (ESM, CommonJS, default wrapper)
+            let WebcastPushConnection;
+            if (importedModule.WebcastPushConnection) {
+                WebcastPushConnection = importedModule.WebcastPushConnection;
+            } else if (importedModule.default && importedModule.default.WebcastPushConnection) {
+                WebcastPushConnection = importedModule.default.WebcastPushConnection;
+            } else if (importedModule.default) {
+                WebcastPushConnection = importedModule.default;
+            } else {
+                WebcastPushConnection = importedModule;
+            }
+
+            // Kiểm tra bảo hiểm cuối cùng xem đã lấy được constructor chưa
+            if (typeof WebcastPushConnection !== 'function') {
+                throw new Error("Không thể trích xuất WebcastPushConnection class.");
+            }
 
             // Khởi tạo kết nối sử dụng API Key từ Euler Stream để vượt tường lửa TikTok ổn định
             tiktok = new WebcastPushConnection(username, {
@@ -57,8 +74,8 @@ io.on('connection', (socket) => {
             });
 
         } catch (initErr) {
-            console.error("Lỗi khởi tạo thư viện TikTok:", initErr.message);
-            socket.emit('status', `Lỗi hệ thống: Không thể khởi tạo bộ kết nối.`);
+            console.error("Lỗi cấu trúc khởi tạo:", initErr.message);
+            socket.emit('status', `Lỗi hệ thống: ${initErr.message}`);
         }
     });
 
