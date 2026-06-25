@@ -27,8 +27,10 @@ io.on('connection', (socket) => {
         try {
             socket.emit('status', `Đang kết nối đến phòng: ${username}...`);
 
-            // Khởi tạo đối tượng kết nối qua cổng proxy của tiktok-live-events
-            tiktokLive = new TikTokLive(username);
+            // Khởi tạo kết nối với mã API Key cá nhân của bạn để xóa hoàn toàn giới hạn ẩn danh
+            tiktokLive = new TikTokLive(username, {
+                apiKey: "tk_f147cb9aa9f90ecde942e5877763f5123098a41e37cd1797"
+            });
 
             // Kích hoạt lệnh kết nối
             await tiktokLive.connect();
@@ -53,7 +55,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Khi người dùng tắt tab/F5 trình duyệt, tự động hủy kết nối bot để tiết kiệm tài nguyên
+    // Khi người dùng tắt tab hoặc F5, tự động hủy kết nối để tiết kiệm tài nguyên
     socket.on('disconnect', () => {
         if (tiktokLive) {
             try {
