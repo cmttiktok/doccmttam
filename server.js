@@ -1,7 +1,12 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import { WebcastPushConnection } from 'tiktok-live-connector';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -15,32 +20,12 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 io.on('connection', (socket) => {
     let tiktok;
 
-    socket.on('set-username', async (username) => {
+    socket.on('set-username', (username) => {
         if (tiktok) {
             tiktok.disconnect().catch(() => {});
         }
 
         try {
-            // Nạp động module
-            const importedModule = await import('tiktok-live-connector');
-            
-            // Giải mã chuẩn xác Constructor bất kể thư viện đóng gói kiểu gì (ESM, CommonJS, default wrapper)
-            let WebcastPushConnection;
-            if (importedModule.WebcastPushConnection) {
-                WebcastPushConnection = importedModule.WebcastPushConnection;
-            } else if (importedModule.default && importedModule.default.WebcastPushConnection) {
-                WebcastPushConnection = importedModule.default.WebcastPushConnection;
-            } else if (importedModule.default) {
-                WebcastPushConnection = importedModule.default;
-            } else {
-                WebcastPushConnection = importedModule;
-            }
-
-            // Kiểm tra bảo hiểm cuối cùng xem đã lấy được constructor chưa
-            if (typeof WebcastPushConnection !== 'function') {
-                throw new Error("Không thể trích xuất WebcastPushConnection class.");
-            }
-
             // Khởi tạo kết nối sử dụng API Key từ Euler Stream để vượt tường lửa TikTok ổn định
             tiktok = new WebcastPushConnection(username, {
                 clientParams: {
@@ -74,7 +59,7 @@ io.on('connection', (socket) => {
             });
 
         } catch (initErr) {
-            console.error("Lỗi cấu trúc khởi tạo:", initErr.message);
+            console.error("Lỗi khởi tạo:", initErr.message);
             socket.emit('status', `Lỗi hệ thống: ${initErr.message}`);
         }
     });
