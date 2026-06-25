@@ -6,6 +6,8 @@
     <title>BÈO LIVE COMMENTS</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
+    <!-- Thư viện tính toán Lịch Âm Việt Nam -->
+    <script src="https://cdn.jsdelivr.net/gh/nguyenvanhieu/amlich-javascript@master/amlich-hieu.js"></script>
     <style>
         :root { 
             --pink: #fe2c55; 
@@ -18,18 +20,30 @@
             background: var(--bg); 
             margin: 0; padding: 15px; 
             display: flex; flex-direction: column; align-items: center; 
-            gap: 15px;
+            gap: 12px;
         }
-        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
+        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; }
         .card { 
-            background: var(--panel); padding: 20px; border-radius: 20px; 
+            background: var(--panel); padding: 15px; border-radius: 20px; 
             border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254,44,85,0.1);
             text-align: center;
         }
+        
+        /* Widget Đồng hồ & Lịch */
+        .clock-widget {
+            display: flex; flex-direction: column; gap: 4px;
+            background: linear-gradient(135deg, #fff0f3 0%, #ffffff 100%);
+            border-radius: 15px; padding: 10px; margin-bottom: 10px;
+            border: 1px dashed var(--pink);
+        }
+        .clock-time { font-size: 24px; font-weight: 700; color: var(--pink); }
+        .clock-date { font-size: 13px; color: #444; font-weight: 600; }
+        .clock-lunar { font-size: 13px; color: #2f80ed; font-weight: 700; margin-top: 2px; }
+
         input {
             width: 100%; padding: 12px; border-radius: 12px;
             border: 1px solid #ddd; background: #f8f9fa;
-            font-family: inherit; font-size: 16px; text-align: center; margin-bottom: 12px;
+            font-family: inherit; font-size: 16px; text-align: center; margin-bottom: 10px;
         }
         button {
             width: 100%; padding: 14px; border: none; border-radius: 12px;
@@ -37,17 +51,25 @@
             font-size: 16px; cursor: pointer; transition: 0.2s;
         }
         button:hover { opacity: 0.9; transform: scale(0.98); }
-        .status-text { font-size: 13px; color: #666; margin-top: 8px; display: block; }
+        .status-text { font-size: 13px; color: #28a745; font-weight: bold; margin-top: 8px; display: block; }
         
+        /* Khung hiển thị chat tối ưu cỡ chữ và giới hạn khoảng 6 dòng cùng lúc */
         .chat-box {
-            width: 100%; height: 450px; background: #fff;
+            width: 100%; 
+            height: 290px; /* Chiều cao vừa vặn cho khoảng 6 dòng chat */
+            background: #fff;
             border-radius: 15px; border: 1px solid #eee;
-            padding: 15px; overflow-y: auto; text-align: left;
-            display: flex; flex-direction: column; gap: 10px;
+            padding: 12px; overflow-y: hidden; text-align: left;
+            display: flex; flex-direction: column; justify-content: flex-end; gap: 10px;
         }
-        .msg { font-size: 15px; line-height: 1.4; animation: fadeIn 0.3s ease; }
+        .msg { 
+            font-size: 18px; /* Tăng cỡ chữ lên một chút theo yêu cầu */
+            line-height: 1.4; 
+            animation: fadeIn 0.3s ease; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
         .user { color: var(--pink); font-weight: 700; margin-right: 5px; }
-        .txt { color: #333; }
+        .txt { color: #333; font-weight: 600; }
         
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
@@ -58,16 +80,22 @@
 <body>
 
     <div class="container">
-        <!-- Khu vực kết nối -->
-        <div class="card">
+        <!-- Khu vực Tiện ích Đồng hồ & Lịch -->
+        <div class="card" style="padding: 10px 15px;">
+            <div class="clock-widget">
+                <div class="clock-time" id="txtTime">00:00:00</div>
+                <div class="clock-date" id="txtDate">Thứ ..., ngày --/--/----</div>
+                <div class="clock-lunar" id="txtLunar">🏮 Lịch Âm: Ngày -- Tày --</div>
+            </div>
+            
             <input type="text" id="username" value="chipham1" placeholder="Nhập tên tài khoản TikTok Live">
             <button id="btnConnect">KẾT NỐI LIVE</button>
             <span class="status-text" id="status">Chưa kết nối</span>
         </div>
 
         <!-- Khu vực hiển thị bình luận -->
-        <div class="card" style="padding: 15px;">
-            <h3 style="margin: 0 0 10px 0; color: var(--pink); font-size: 16px;">💬 BÌNH LUẬN TRỰC TIẾP</h3>
+        <div class="card" style="padding: 12px;">
+            <h3 style="margin: 0 0 8px 0; color: var(--pink); font-size: 15px; letter-spacing: 0.5px;">💬 BÌNH LUẬN TRỰC TIẾP</h3>
             <div class="chat-box" id="chatBox"></div>
         </div>
     </div>
@@ -79,23 +107,79 @@
         const statusText = document.getElementById('status');
         const chatBox = document.getElementById('chatBox');
 
+        // 1. TÍNH NĂNG GIỮ SÁNG MÀN HÌNH LIÊN TỤC (Wake Lock API)
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('⚡ Đã kích hoạt giữ sáng màn hình liên tục.');
+                }
+            } catch (err) {
+                console.log(`Không thể giữ sáng màn hình: ${err.message}`);
+            }
+        }
+        // Tự động kích hoạt lại khi người dùng quay lại tab web
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+
+        // 2. TÍNH NĂNG ĐỒNG HỒ + LỊCH DƯƠNG + LỊCH ÂM
+        function updateClock() {
+            const now = new Date();
+            
+            // Thời gian
+            let hours = String(now.getHours()).padStart(2, '0');
+            let minutes = String(now.getMinutes()).padStart(2, '0');
+            let seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('txtTime').innerText = `${hours}:${minutes}:${seconds}`;
+            
+            // Ngày Dương lịch
+            const daysOfWeek = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+            let dayName = daysOfWeek[now.getDay()];
+            let day = String(now.getDate()).padStart(2, '0');
+            let month = String(now.getMonth() + 1).padStart(2, '0');
+            let year = now.getFullYear();
+            document.getElementById('txtDate').innerText = `${dayName}, ngày ${day}/${month}/${year}`;
+            
+            // Tính toán ngày âm (Chỉ chạy cập nhật 1 lần mỗi giây hoặc khi load trang)
+            if (seconds === "00" || document.getElementById('txtLunar').innerText.includes('--')) {
+                const lunar = getLunarDate(now.getDate(), now.getMonth() + 1, year);
+                // Thư viện trả về mảng [lunarDay, lunarMonth, lunarYear, isLeap]
+                document.getElementById('txtLunar').innerText = `🏮 Lịch Âm: Ngày ${lunar[0]}/${lunar[1]} năm ${lunar[2]}`;
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 3. XỬ LÝ SỰ KIỆN KẾT NỐI
         btnConnect.onclick = () => {
             const user = usernameInput.value.trim();
             if(!user) return alert('Vui lòng nhập ID!');
             socket.emit('set-username', user);
+            requestWakeLock(); // Giữ sáng màn hình ngay khi bắt đầu bấm kết nối live
         };
 
         socket.on('status', (msg) => {
             statusText.innerText = msg;
         });
 
+        // 4. HIỂN THỊ CHAT (TĂNG CỠ CHỮ & GIỚI HẠN TỐI ĐA 6 COMMENT HIỂN THỊ)
         socket.on('comment-data', (data) => {
             const msgDiv = document.createElement('div');
             msgDiv.className = 'msg';
             msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
+            
             chatBox.appendChild(msgDiv);
             
-            // Tự động cuộn xuống khi có bình luận mới
+            // Nếu số lượng comment vượt quá 6 dòng, tự động xóa dòng cũ nhất trên đầu đi
+            while (chatBox.children.length > 6) {
+                chatBox.removeChild(chatBox.firstChild);
+            }
+            
+            // Đẩy khung cuộn sát xuống dưới cùng
             chatBox.scrollTop = chatBox.scrollHeight;
         });
     </script>
