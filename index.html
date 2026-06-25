@@ -4,17 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BÈO LIVE COMMENTS</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght=600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         :root { 
             --pink: #fe2c55; 
             --bg: #fff0f3; 
             --panel: #ffffff; 
         }
-        
         * { box-sizing: border-box; }
-
         body { 
             font-family: 'Quicksand', sans-serif; 
             background: var(--bg); 
@@ -22,134 +20,84 @@
             display: flex; flex-direction: column; align-items: center; 
             gap: 15px;
         }
-
         .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
-
-        /* NEON GLASS CARD */
         .card { 
             background: var(--panel); padding: 20px; border-radius: 20px; 
-            border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254, 44, 85, 0.1);
+            border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254,44,85,0.1);
+            text-align: center;
         }
-
-        /* KHUNG CHAT HIỂN THỊ LỚN TỐI ƯU CHO MOBILE */
-        .chat-card { height: 650px; display: flex; flex-direction: column; }
-        #chat { 
-            flex: 1; overflow-y: auto; 
-            display: flex; flex-direction: column; 
-            scrollbar-width: thin;
+        input {
+            width: 100%; padding: 12px; border-radius: 12px;
+            border: 1px solid #ddd; background: #f8f9fa;
+            font-family: inherit; font-size: 16px; text-align: center; margin-bottom: 12px;
         }
-        #chat::-webkit-scrollbar { width: 5px; }
-        #chat::-webkit-scrollbar-thumb { background: var(--pink); border-radius: 10px; }
-
-        .msg { padding: 12px; border-bottom: 1px solid #fdf0f2; font-size: 16px; line-height: 1.4; word-break: break-word; }
-        .msg b { color: var(--pink); }
-
-        /* INPUT VÀ NÚT KẾT NỐI */
-        input[type="text"] { width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #eee; margin-bottom: 10px; outline: none; font-family: inherit; font-size: 15px; }
-        input:focus { border-color: var(--pink); box-shadow: 0 0 10px rgba(254, 44, 85, 0.2); }
+        button {
+            width: 100%; padding: 14px; border: none; border-radius: 12px;
+            background: var(--pink); color: white; font-weight: bold;
+            font-size: 16px; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { opacity: 0.9; transform: scale(0.98); }
+        .status-text { font-size: 13px; color: #666; margin-top: 8px; display: block; }
         
-        button.conn-btn { 
-            width: 100%; padding: 12px; background: var(--pink); color: white; border: none; 
-            border-radius: 12px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 15px;
-            box-shadow: 0 4px 15px rgba(254, 44, 85, 0.3); transition: 0.3s;
+        .chat-box {
+            width: 100%; height: 450px; background: #fff;
+            border-radius: 15px; border: 1px solid #eee;
+            padding: 15px; overflow-y: auto; text-align: left;
+            display: flex; flex-direction: column; gap: 10px;
         }
-
-        #stt { font-size: 12px; text-align: center; margin-top: 8px; color: #999; font-weight: bold; }
+        .msg { font-size: 15px; line-height: 1.4; animation: fadeIn 0.3s ease; }
+        .user { color: var(--pink); font-weight: 700; margin-right: 5px; }
+        .txt { color: #333; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="card">
-        <input type="text" id="user" placeholder="Nhập ID hoặc Link TikTok Live...">
-        <button class="conn-btn" id="btnConn" onclick="start()">KẾT NỐI LIVE</button>
-        <div id="stt">Trạng thái: Đang chờ...</div>
+    <div class="container">
+        <!-- Khu vực kết nối -->
+        <div class="card">
+            <input type="text" id="username" value="chipham1" placeholder="Nhập tên tài khoản TikTok Live">
+            <button id="btnConnect">KẾT NỐI LIVE</button>
+            <span class="status-text" id="status">Chưa kết nối</span>
+        </div>
+
+        <!-- Khu vực hiển thị bình luận -->
+        <div class="card" style="padding: 15px;">
+            <h3 style="margin: 0 0 10px 0; color: var(--pink); font-size: 16px;">💬 BÌNH LUẬN TRỰC TIẾP</h3>
+            <div class="chat-box" id="chatBox"></div>
+        </div>
     </div>
 
-    <div class="card chat-card">
-        <h3 style="margin: 0 0 10px 0; color: var(--pink); font-size: 18px; border-bottom: 2px solid var(--bg); padding-bottom: 5px; text-align: center;">💬 BÌNH LUẬN TRỰC TIẾP</h3>
-        <div id="chat"></div>
-    </div>
-</div>
+    <script>
+        const socket = io();
+        const btnConnect = document.getElementById('btnConnect');
+        const usernameInput = document.getElementById('username');
+        const statusText = document.getElementById('status');
+        const chatBox = document.getElementById('chatBox');
 
-<script>
-    // Cấu hình kết nối WebSocket ưu tiên giúp Socket.io bắt tay nhanh không lag
-    const socket = io({ transports: ['websocket', 'polling'] });
+        btnConnect.onclick = () => {
+            const user = usernameInput.value.trim();
+            if(!user) return alert('Vui lòng nhập ID!');
+            socket.emit('set-username', user);
+        };
 
-    // Biến toàn cục để quản lý trạng thái giữ sáng màn hình
-    let wakeLock = null;
+        socket.on('status', (msg) => {
+            statusText.innerText = msg;
+        });
 
-    // Hàm gọi API đánh thức hệ thống giữ sáng màn hình
-    async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-                console.log('🔒 Đã kích hoạt Wake Lock: Màn hình sẽ luôn sáng liên tục!');
-            } else {
-                console.log('⚠️ Trình duyệt này không hỗ trợ tự động giữ sáng.');
-            }
-        } catch (err) {
-            console.log(`❌ Lỗi giữ sáng màn hình: ${err.name}, ${err.message}`);
-        }
-    }
-
-    socket.on('disconnect', () => {
-        const sttBox = document.getElementById('stt');
-        sttBox.innerText = "Mất kết nối server, đang thử lại...";
-        sttBox.style.color = "red";
-    });
-
-    function start() {
-        const u = document.getElementById('user').value.trim();
-        if(u) {
-            socket.emit('set-username', u);
-            document.getElementById('stt').innerText = "Đang kết nối đến: " + u;
-            document.getElementById('stt').style.color = "#999";
+        socket.on('comment-data', (data) => {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'msg';
+            msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
+            chatBox.appendChild(msgDiv);
             
-            // Kích hoạt tính năng giữ sáng màn hình ngay khi người dùng bấm kết nối
-            requestWakeLock();
-        }
-    }
-
-    socket.on('status', m => {
-        const sttBox = document.getElementById('stt');
-        const btn = document.getElementById('btnConn');
-        sttBox.innerText = m;
-        
-        if (m.includes("Đã kết nối")) {
-            sttBox.style.color = "#2ecc71";
-            btn.innerText = "ĐÃ KẾT NỐI THÀNH CÔNG";
-            btn.style.background = "#2ecc71";
-            btn.style.boxShadow = "0 0 15px #2ecc71";
-        } else if (m.includes("thất bại")) {
-            sttBox.style.color = "red";
-            btn.style.background = "#fe2c55";
-            btn.innerText = "KẾT NỐI LIVE";
-        }
-    });
-
-    // Nhận dữ liệu bình luận từ Server và hiển thị siêu tốc
-    socket.on('comment-data', d => {
-        const chat = document.getElementById('chat');
-        const div = document.createElement('div');
-        div.className = 'msg';
-        div.innerHTML = `<b>${d.user}:</b> ${d.comment}`;
-        
-        chat.appendChild(div);
-        chat.scrollTop = chat.scrollHeight; // Tự động cuộn xuống dưới cùng để xem cmt mới nhất
-
-        // Giới hạn hiển thị tối đa 100 comment trên màn hình điện thoại để tránh giật lag máy
-        if (chat.childNodes.length > 100) {
-            chat.removeChild(chat.firstChild);
-        }
-    });
-
-    // Tự động kích hoạt lại giữ sáng nếu người dùng vô tình ẩn tab/khóa màn hình rồi mở lại trang web
-    document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') {
-            await requestWakeLock();
-        }
-    });
-</script>
+            // Tự động cuộn xuống khi có bình luận mới
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    </script>
 </body>
 </html>
