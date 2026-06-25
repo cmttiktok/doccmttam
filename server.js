@@ -21,7 +21,7 @@ io.on('connection', (socket) => {
             tiktok.disconnect().catch(() => {});
         }
 
-        // Khởi tạo kết nối với Sign Server cộng đồng ổn định
+        // Khởi tạo kết nối sử dụng API Key từ Euler Stream để vượt tường lửa TikTok ổn định
         tiktok = new WebcastPushConnection(username, {
             clientParams: {
                 "app_language": "en-US",
@@ -30,7 +30,7 @@ io.on('connection', (socket) => {
             requestOptions: {
                 timeout: 10000
             },
-            signServerUrl: "https://tiktok.live.w7.gg/"
+            signApiKey: "euler_NmJmODEyMmZlOTFiNzI2NmU2YTc0YjlmYTM2Nzg4NWIyMWIyMWI4NTA4ODAyMGZjZmQyMjNk"
         });
 
         tiktok.connect()
