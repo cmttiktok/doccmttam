@@ -2,6 +2,7 @@
   "name": "tiktok-live-comments-only",
   "version": "2.0.0",
   "main": "server.js",
+  "type": "module",
   "dependencies": {
     "express": "^4.18.2",
     "http": "^0.0.1-security",
