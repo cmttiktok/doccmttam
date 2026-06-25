@@ -2,48 +2,39 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BÈO CONTROL PANEL - CHAT 12 DÒNG</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BÈO LIVE COMMENTS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght=600;700&display=swap" rel="stylesheet">
     <style>
-        :root { 
-            --pink: #fe2c55; 
-            --bg: #fff0f3; 
-            --panel: #ffffff; 
-        }
+        :root { --pink: #fe2c55; --bg: #fff0f3; --panel: #ffffff; }
         * { box-sizing: border-box; }
-
         body { 
-            font-family: 'Quicksand', sans-serif; 
-            background: var(--bg); 
-            margin: 0; padding: 15px; 
-            display: flex; flex-direction: column; align-items: center; 
-            gap: 15px;
+            font-family: 'Quicksand', sans-serif; background: var(--bg); 
+            margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; gap: 12px;
         }
-
-        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
-
+        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; }
         .card { 
-            background: var(--panel); padding: 20px; border-radius: 20px; 
-            border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254,44,85,0.08); 
-            text-align: center;
+            background: var(--panel); padding: 15px; border-radius: 20px; 
+            border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254,44,85,0.1); text-align: center;
         }
-
+        
         .clock-widget {
             background: linear-gradient(135deg, #fff0f3 0%, #ffffff 100%);
             border-radius: 15px; padding: 10px; margin-bottom: 10px; border: 1px dashed var(--pink);
         }
         .clock-time { font-size: 26px; font-weight: 700; color: var(--pink); }
-        .clock-date { font-size: 13px; color: #444; font-weight: 600; }
+        .clock-date { font-size: 14px; color: #444; font-weight: 600; }
 
+        /* Khung bảng thông báo chạy chữ */
         .marquee-box {
             background: #222; color: #fff; padding: 10px; border-radius: 12px;
             margin-bottom: 10px; font-weight: 700; overflow: hidden; white-space: nowrap;
+            border: 1px solid var(--pink); box-shadow: inset 0 0 10px rgba(254,44,85,0.5);
         }
         .marquee-text {
             display: inline-block; padding-left: 100%; animation: marquee 15s linear infinite;
-            font-size: 15px; color: #ffeb3b;
+            font-size: 16px; color: #ffeb3b;
         }
         @keyframes marquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
 
@@ -51,82 +42,44 @@
             width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd;
             background: #f8f9fa; font-family: inherit; font-size: 16px; text-align: center; margin-bottom: 10px;
         }
-        
-        .btn {
+        button {
             width: 100%; padding: 14px; border: none; border-radius: 12px;
-            background: var(--pink); color: white; font-weight: bold; font-size: 16px; 
-            cursor: pointer;
+            background: var(--pink); color: white; font-weight: bold; font-size: 16px; cursor: pointer;
         }
-
-        .status-text { font-size: 13px; color: #28a745; font-weight: bold; margin-top: 6px; display: block; }
-
-        .chat-container-title {
-            margin: 0 0 10px 0; color: var(--pink); font-size: 16px; font-weight: bold; text-align: left;
-        }
+        .status-text { font-size: 13px; color: #28a745; font-weight: bold; margin-top: 8px; display: block; }
         
         .chat-box {
-            width: 100%; 
-            height: 480px; 
-            background: #fff; border-radius: 15px; border: 1px solid #eee;
-            padding: 10px; overflow-y: auto; 
-            display: flex; flex-direction: column; justify-content: flex-start; gap: 6px;
+            width: 100%; height: 290px; background: #fff; border-radius: 15px; border: 1px solid #eee;
+            padding: 12px; overflow-y: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px;
         }
-
-        .msg { 
-            font-size: 18px; 
-            line-height: 1.5; 
-            padding: 8px 12px; 
-            border-radius: 10px;
-            animation: fadeIn 0.25s ease; 
-            white-space: normal; 
-            word-break: break-word; 
-            text-align: left; 
-        }
-        .msg:nth-child(even) { background-color: #fff0f3; } 
-        .msg:nth-child(odd) { background-color: #ffffff; }  
-        
-        .user { color: var(--pink); font-weight: 700; margin-right: 6px; display: inline; }
-        .txt { color: #222; font-weight: 600; display: inline; }
-        
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* CHẾ ĐỘ TOÀN MÀN HÌNH */
-        body.fullscreen-mode { padding: 0; background: #ffffff; }
-        body.fullscreen-mode .container { max-width: 100%; gap: 0; height: 100vh; }
-        body.fullscreen-mode .card-control { display: none !important; }
-        body.fullscreen-mode .card-chat { border: none; border-radius: 0; box-shadow: none; padding: 5px; height: 100vh; }
-        body.fullscreen-mode .chat-box { height: calc(100vh - 60px); border: none; padding: 5px; }
-        
-        .admin-link { color: #666; text-align: center; display: block; font-size: 13px; text-decoration: none; font-weight: bold; margin-top: 5px; }
+        .msg { font-size: 18px; line-height: 1.4; animation: fadeIn 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+        .user { color: var(--pink); font-weight: 700; margin-right: 5px; }
+        .txt { color: #333; font-weight: 600; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="card card-control">
+        <div class="card" style="padding: 10px 15px;">
             <div class="clock-widget">
                 <div class="clock-time" id="txtTime">00:00:00</div>
-                <div class="clock-date" id="txtDate">Đang tải...</div>
+                <div class="clock-date" id="txtDate">Đang tải thời gian...</div>
             </div>
 
             <div class="marquee-box">
-                <span class="marquee-text" id="marqueeContent">Đang kiểm tra lịch...</span>
+                <span class="marquee-text" id="marqueeContent">Đang kiểm tra lịch nhắc nhở...</span>
             </div>
             
             <input type="text" id="username" value="chipham1" placeholder="Nhập tên tài khoản TikTok Live">
-            <button id="btnConnect" class="btn">KẾT NỐI LIVE</button>
+            <button id="btnConnect">KẾT NỐI LIVE</button>
             <span class="status-text" id="status">Chưa kết nối</span>
         </div>
 
-        <div class="card card-chat">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 class="chat-container-title" style="margin:0;">💬 BÌNH LUẬN TRỰC TIẾP (12 DÒNG)</h3>
-                <button id="btnToggleFS" style="width:auto; padding: 6px 12px; margin:0; font-size:12px;" class="btn">TOÀN MÀN HÌNH</button>
-            </div>
+        <div class="card" style="padding: 12px;">
+            <h3 style="margin: 0 0 8px 0; color: var(--pink); font-size: 15px;">💬 BÌNH LUẬN TRỰC TIẾP</h3>
             <div class="chat-box" id="chatBox"></div>
         </div>
-
-        <a href="/admin" class="admin-link card-control">⚙️ CÀI ĐẶT NGÀY NHẮC NHỞ</a>
     </div>
 
     <script>
@@ -135,8 +88,8 @@
         const usernameInput = document.getElementById('username');
         const statusText = document.getElementById('status');
         const chatBox = document.getElementById('chatBox');
-        const btnToggleFS = document.getElementById('btnToggleFS');
 
+        // Lời chúc ngẫu nhiên nếu ngày hôm đó không có lịch hẹn
         const defaultWishes = [
             "Chúc Bé Chi có một buổi livestream tràn ngập niềm vui và ngập tràn quà tặng! ✨",
             "Chúc phòng live luôn rực rỡ, mọi người tương tác thật vui vẻ nhé! 💕",
@@ -144,22 +97,13 @@
             "Chúc vạn sự hanh thông, live mượt mà, người xem tăng vùn vụt! 🚀"
         ];
 
+        // Giữ sáng màn hình
         let wakeLock = null;
         async function requestWakeLock() {
             try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {}
         }
 
-        btnToggleFS.onclick = () => {
-            document.body.classList.toggle('fullscreen-mode');
-            if(document.body.classList.contains('fullscreen-mode')) {
-                btnToggleFS.innerText = "THOÁT TOÀN MÀN HÌNH";
-                btnToggleFS.style.background = "#333";
-            } else {
-                btnToggleFS.innerText = "TOÀN MÀN HÌNH";
-                btnToggleFS.style.background = "#fe2c55";
-            }
-        };
-
+        // Tải dữ liệu nhắc nhở từ Server và hiển thị
         async function checkReminders(currentDateStr) {
             try {
                 const res = await fetch('/api/reminders');
@@ -167,56 +111,62 @@
                 const marqueeEl = document.getElementById('marqueeContent');
                 
                 if (reminders[currentDateStr]) {
-                    marqueeEl.innerHTML = `📢 NHẮC NHỞ HÔM NAY: ${reminders[currentDateStr]} 🔥`;
-                    marqueeEl.style.color = "#ffeb3b";
+                    marqueeEl.innerHTML = `📢 NHẮC NHỞ HÔM NAY: ${reminders[currentDateStr]} 🔥🔥🔥`;
+                    marqueeEl.style.color = "#ffeb3b"; // Màu vàng nổi bật cho ghi chú
                 } else {
+                    // Chọn ngẫu nhiên 1 lời chúc
                     const randomWish = defaultWishes[Math.floor(Math.random() * defaultWishes.length)];
                     marqueeEl.innerHTML = `🌟 ${randomWish}`;
-                    marqueeEl.style.color = "#00ffcc";
+                    marqueeEl.style.color = "#00ffcc"; // Màu xanh ngọc cho lời chúc
                 }
-            } catch (e) {}
+            } catch (e) {
+                document.getElementById('marqueeContent').innerText = "Chúc buổi live stream diễn ra tốt đẹp! ❤️";
+            }
         }
 
+        // Cập nhật đồng hồ và kiểm tra ngày mới
         let lastCheckedDate = "";
         function updateClock() {
             const now = new Date();
-            document.getElementById('txtTime').innerText = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            let hours = String(now.getHours()).padStart(2, '0');
+            let minutes = String(now.getMinutes()).padStart(2, '0');
+            let seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('txtTime').innerText = `${hours}:${minutes}:${seconds}`;
             
             const daysOfWeek = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
-            let currentDateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+            let dayStr = String(now.getDate()).padStart(2, '0');
+            let monthStr = String(now.getMonth() + 1).padStart(2, '0');
+            let currentDateStr = `${dayStr}/${monthStr}`; // Định dạng DD/MM
             
             if (currentDateStr !== lastCheckedDate) {
                 lastCheckedDate = currentDateStr;
-                document.getElementById('txtDate').innerText = `${daysOfWeek[now.getDay()]}, Ngày ${currentDateStr}/${now.getFullYear()}`;
+                document.getElementById('txtDate').innerText = `${daysOfWeek[now.getDay()]}, Ngày ${dayStr}/${monthStr}/${now.getFullYear()}`;
                 checkReminders(currentDateStr);
             }
         }
         setInterval(updateClock, 1000);
         updateClock();
 
-        btnConnect.onclick = () => {
+        // Xử lý nút bấm kết nối
+        btnConnect.addEventListener('click', () => {
             const user = usernameInput.value.trim();
             if(!user) return alert('Vui lòng nhập ID!');
             socket.emit('set-username', user);
             requestWakeLock();
-        };
+        });
 
         socket.on('status', (msg) => { statusText.innerText = msg; });
 
-        // ĐÃ SỬA CHÍNH XÁC: Đồng bộ đúng tên sự kiện 'audio-data' từ server của bạn gửi về
-        socket.on('audio-data', (data) => {
-            // Chỉ hiển thị nếu loại dữ liệu là tin nhắn chat thường
-            if (data.type === 'chat' && data.user && data.comment) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg';
-                msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
-                chatBox.appendChild(msgDiv);
-                
-                while (chatBox.children.length > 12) {
-                    chatBox.removeChild(chatBox.firstChild);
-                }
-                chatBox.scrollTop = chatBox.scrollHeight;
+        socket.on('comment-data', (data) => {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'msg';
+            msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
+            chatBox.appendChild(msgDiv);
+            
+            while (chatBox.children.length > 6) {
+                chatBox.removeChild(chatBox.firstChild);
             }
+            chatBox.scrollTop = chatBox.scrollHeight;
         });
     </script>
 </body>
