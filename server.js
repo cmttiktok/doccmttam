@@ -21,22 +21,19 @@ io.on('connection', (socket) => {
         }
 
         try {
-            // Nạp động module theo cơ chế bất đồng bộ
+            // Nạp động module theo cơ chế bất đồng bộ bảo hiểm constructor
             const connectorModule = await import('tiktok-live-connector');
             
-            // Ở phiên bản mới nhất, class chính chính là bản thân default export hoặc default.WebcastPushConnection
             const WebcastPushConnection = connectorModule.default?.WebcastPushConnection || 
                                           connectorModule.default || 
                                           connectorModule.WebcastPushConnection || 
                                           connectorModule;
 
-            // Bảo hiểm kiểm tra log nếu vẫn sai kiểu dữ liệu
             if (typeof WebcastPushConnection !== 'function') {
-                console.error("Kiểu dữ liệu nhận được:", typeof WebcastPushConnection);
-                throw new Error("Không thể tìm thấy Class WebcastPushConnection phù hợp.");
+                throw new Error("Không thể trích xuất lớp kết nối.");
             }
 
-            // Khởi tạo kết nối sử dụng Sign Server ổn định
+            // Sử dụng chính xác API Key Euler Stream của bạn để vượt tường lửa ổn định
             tiktok = new WebcastPushConnection(username, {
                 clientParams: {
                     "app_language": "en-US",
@@ -45,7 +42,7 @@ io.on('connection', (socket) => {
                 requestOptions: {
                     timeout: 10000
                 },
-                signServerUrl: "https://tiktok.live.w7.gg/"
+                signApiKey: "euler_NmJmODEyMmZlOTFiNzI2NmU2YTc0YjlmYTM2Nzg4NWIyMWIyMWI4NTA4ODAyMGZjZmQyMjNk"
             });
 
             tiktok.connect()
@@ -79,6 +76,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Cấu hình PORT linh hoạt để chạy mượt mà trên Render
+// Cấu hình PORT linh hoạt chạy trên Render
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Hệ thống chạy tại port ${PORT}`));
