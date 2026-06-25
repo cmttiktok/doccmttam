@@ -21,20 +21,22 @@ io.on('connection', (socket) => {
         }
 
         try {
-            // Giải pháp nạp động tương thích ngược an toàn tuyệt đối cho require
+            // Nạp động module theo cơ chế bất đồng bộ
             const connectorModule = await import('tiktok-live-connector');
             
-            // Tìm chính xác Class Constructor bất kể cấu trúc đóng gói nào của phiên bản mới
-            const WebcastPushConnection = connectorModule.WebcastPushConnection || 
-                                          (connectorModule.default && connectorModule.default.WebcastPushConnection) || 
+            // Ở phiên bản mới nhất, class chính chính là bản thân default export hoặc default.WebcastPushConnection
+            const WebcastPushConnection = connectorModule.default?.WebcastPushConnection || 
                                           connectorModule.default || 
+                                          connectorModule.WebcastPushConnection || 
                                           connectorModule;
 
+            // Bảo hiểm kiểm tra log nếu vẫn sai kiểu dữ liệu
             if (typeof WebcastPushConnection !== 'function') {
-                throw new Error("Không thể trích xuất lớp kết nối.");
+                console.error("Kiểu dữ liệu nhận được:", typeof WebcastPushConnection);
+                throw new Error("Không thể tìm thấy Class WebcastPushConnection phù hợp.");
             }
 
-            // Khởi tạo kết nối sử dụng API Key từ Euler Stream để vượt tường lửa TikTok ổn định
+            // Khởi tạo kết nối sử dụng Sign Server ổn định
             tiktok = new WebcastPushConnection(username, {
                 clientParams: {
                     "app_language": "en-US",
@@ -43,7 +45,7 @@ io.on('connection', (socket) => {
                 requestOptions: {
                     timeout: 10000
                 },
-                signApiKey: "euler_NmJmODEyMmZlOTFiNzI2NmU2YTc0YjlmYTM2Nzg4NWIyMWIyMWI4NTA4ODAyMGZjZmQyMjNk"
+                signServerUrl: "https://tiktok.live.w7.gg/"
             });
 
             tiktok.connect()
@@ -68,7 +70,7 @@ io.on('connection', (socket) => {
 
         } catch (initErr) {
             console.error("Lỗi cấu trúc khởi tạo:", initErr.message);
-            socket.emit('status', `Lỗi hệ thống: Không thể khởi tạo thư viện TikTok.`);
+            socket.emit('status', `Lỗi hệ thống: ${initErr.message}`);
         }
     });
 
