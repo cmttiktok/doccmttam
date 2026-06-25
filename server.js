@@ -1,8 +1,11 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { WebcastPushConnection } = require('tiktok-live-connector');
+const TikTokLiveConnector = require('tiktok-live-connector');
 const path = require('path');
+
+// Đảm bảo lấy đúng constructor dù ở phiên bản cũ hay mới của thư viện
+const WebcastPushConnection = TikTokLiveConnector.WebcastPushConnection || TikTokLiveConnector;
 
 const app = express();
 const server = http.createServer(app);
