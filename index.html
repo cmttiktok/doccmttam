@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BÈO LIVE COMMENTS - MOBILE FULL DISPLAY</title>
+    <title>BÈO LIVE COMMENTS</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -28,7 +28,6 @@
             transition: all 0.3s ease;
         }
 
-        /* Khối thẻ giao diện cũ */
         .card { 
             background: var(--panel); padding: 15px; border-radius: 20px; 
             border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254,44,85,0.08); 
@@ -36,7 +35,6 @@
             transition: all 0.3s ease;
         }
         
-        /* Cụm đồng hồ tinh gọn */
         .clock-widget {
             background: linear-gradient(135deg, #fff0f3 0%, #ffffff 100%);
             border-radius: 15px; padding: 10px; margin-bottom: 10px; border: 1px dashed var(--pink);
@@ -44,7 +42,6 @@
         .clock-time { font-size: 26px; font-weight: 700; color: var(--pink); }
         .clock-date { font-size: 13px; color: #444; font-weight: 600; }
 
-        /* Bảng chữ chạy thông báo */
         .marquee-box {
             background: #222; color: #fff; padding: 10px; border-radius: 12px;
             margin-bottom: 10px; font-weight: 700; overflow: hidden; white-space: nowrap;
@@ -68,28 +65,27 @@
         
         .status-text { font-size: 13px; color: #28a745; font-weight: bold; margin-top: 6px; display: block; }
         
-        /* KHU VỰC CHAT ĐÃ SỬA LỖI HIỂN THỊ ĐẦY ĐỦ */
         .chat-container-title {
             margin: 0 0 10px 0; color: var(--pink); font-size: 16px; font-weight: bold; text-align: left;
         }
         
+        /* ĐÃ FIX: Giữ nguyên chiều cao cố định 480px không cho co cụm */
         .chat-box {
             width: 100%; 
-            max-height: 520px; /* Tối ưu chiều cao linh hoạt tự co giãn */
+            height: 480px; 
             background: #fff; border-radius: 15px; border: 1px solid #eee;
-            padding: 10px; overflow-y: auto; /* Cho phép cuộn mượt nếu có dòng xuống hàng */
-            display: flex; flex-direction: column; justify-content: flex-end; gap: 6px;
+            padding: 10px; overflow-y: auto; 
+            display: flex; flex-direction: column; justify-content: flex-start; gap: 6px;
         }
 
-        /* Cấu hình hiển thị chữ đầy đủ, tự động xuống hàng khi cmt quá dài */
         .msg { 
             font-size: 18px; 
-            line-height: 1.5; /* Tăng nhẹ khoảng cách dòng đọc cho thoáng */
+            line-height: 1.5; 
             padding: 8px 12px; 
             border-radius: 10px;
             animation: fadeIn 0.25s ease; 
-            white-space: normal; /* Cho phép xuống dòng tự nhiên */
-            word-break: break-word; /* Bẻ chữ thông minh nếu gặp chuỗi ký tự quá dài */
+            white-space: normal; 
+            word-break: break-word; 
             text-align: left; 
         }
         .msg:nth-child(even) { background-color: #fff0f3; } 
@@ -100,7 +96,7 @@
         
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* CHẾ ĐỘ TOÀN MÀN HÌNH */
+        /* CHẾ ĐỘ TOÀN MÀN HÌNH CHUẨN ĐÃ FIX */
         body.fullscreen-mode {
             padding: 0; background: #ffffff;
         }
@@ -114,8 +110,7 @@
             border: none; border-radius: 0; box-shadow: none; padding: 5px; height: 100vh;
         }
         body.fullscreen-mode .chat-box {
-            max-height: calc(100vh - 50px);
-            height: calc(100vh - 50px);
+            height: calc(100vh - 60px);
             border: none; padding: 5px;
         }
         
@@ -125,6 +120,7 @@
 <body>
 
     <div class="container">
+        <!-- Khối điều khiển -->
         <div class="card card-control">
             <div class="clock-widget">
                 <div class="clock-time" id="txtTime">00:00:00</div>
@@ -140,6 +136,7 @@
             <span class="status-text" id="status">Chưa kết nối</span>
         </div>
 
+        <!-- Khối hiển thị bình luận chính -->
         <div class="card card-chat">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <h3 class="chat-container-title" style="margin:0;">💬 BÌNH LUẬN TRỰC TIẾP (12 DÒNG)</h3>
@@ -231,7 +228,6 @@
             msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
             chatBox.appendChild(msgDiv);
             
-            // Giữ lại số lượng phần tử phù hợp trong khung nhìn
             while (chatBox.children.length > 12) {
                 chatBox.removeChild(chatBox.firstChild);
             }
