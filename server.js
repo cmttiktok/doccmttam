@@ -20,7 +20,7 @@ const Acronym = mongoose.model('Acronym', { key: String, value: String });
 const EmojiMap = mongoose.model('EmojiMap', { icon: String, text: String });
 const BotAnswer = mongoose.model('BotAnswer', { keyword: String, response: String });
 
-// --- API QUẢN TRỊ (Giữ nguyên) ---
+// --- API QUẢN TRỊ ---
 app.get('/api/words', async (req, res) => res.json((await BannedWord.find()).map(w => w.word)));
 app.post('/api/words', async (req, res) => {
     const word = req.body.word ? req.body.word.toLowerCase() : "";
@@ -78,40 +78,39 @@ io.on('connection', (socket) => {
         
         socket.emit('status', `Đang kết nối trực tiếp đến phòng: ${username}...`);
 
-        // FIX LỖI: Cấu hình thêm Header giả lập và Client Param Tiếng Việt để không đi qua server trung gian của tik.tools nữa
         tiktok = new WebcastPushConnection(username, {
-            clientParams: {
-                client_language: "vi-VN",
-                device_platform: "web"
-            },
+            clientParams: { client_language: "vi-VN", device_platform: "web" },
             requestHeaders: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
         });
 
         tiktok.connect()
-            .then(() => {
-                socket.emit('status', `Đã kết nối thành công: ${username}`);
-            })
-            .catch((err) => {
-                console.error("Lỗi kết nối:", err.message);
-                socket.emit('status', `Kết nối thất bại: ${err.message}`);
-            });
+            .then(() => socket.emit('status', `Đã kết nối thành công: ${username}`))
+            .catch((err) => socket.emit('status', `Kết nối thất bại: ${err.message}`));
 
+        // 🌟 SỬA LỖI CHAT: Bảo vệ chống sập và tối ưu lấy tên người dùng
         tiktok.on('chat', async (data) => {
-            if (await isBanned(data.nickname)) return;
-            const botRules = await BotAnswer.find();
-            const match = botRules.find(r => data.comment.toLowerCase().includes(r.keyword));
-            if (match) {
-                const audio = await getGoogleAudio(`Anh ${data.nickname} ơi, ${match.response}`);
-                socket.emit('audio-data', { type: 'bot', user: "TRỢ LÝ", comment: match.response, audio });
-            } else {
-                const final = await processText(data.comment);
-                if (final) {
-                    const audio = await getGoogleAudio(`${data.nickname} nói: ${final}`);
-                    socket.emit('audio-data', { type: 'chat', user: data.nickname, comment: data.comment, audio });
+            try {
+                if (!data) return;
+                const senderName = data.nickname || data.uniqueId || "Người xem";
+                if (await isBanned(senderName)) return;
+
+                const commentText = data.comment || "";
+                const botRules = await BotAnswer.find();
+                const match = botRules.find(r => commentText.toLowerCase().includes(r.keyword));
+                
+                if (match) {
+                    const audio = await getGoogleAudio(`Anh ${senderName} ơi, ${match.response}`);
+                    socket.emit('audio-data', { type: 'bot', user: "TRỢ LÝ", comment: match.response, audio });
+                } else {
+                    const final = await processText(commentText);
+                    if (final) {
+                        const audio = await getGoogleAudio(`${senderName} nói: ${final}`);
+                        socket.emit('audio-data', { type: 'chat', user: senderName, comment: commentText, audio });
+                    }
                 }
-            }
+            } catch (err) { console.error("Lỗi sự kiện chat:", err); }
         });
 
         tiktok.on('linkMicBattle', () => {
@@ -127,20 +126,31 @@ io.on('connection', (socket) => {
             }, 1000);
         });
 
+        // 🌟 SỬA LỖI MEMBER VÀO PHÒNG
         tiktok.on('member', async (data) => {
-            if (!(await isBanned(data.nickname))) {
-                const safeName = await processText(data.nickname);
-                const audio = await getGoogleAudio(`Bèo ơi, anh ${safeName} ghé chơi nè`);
-                socket.emit('audio-data', { type: 'welcome', user: "Hệ thống", comment: `${data.nickname} vào`, audio });
-            }
+            try {
+                if (!data) return;
+                const senderName = data.nickname || data.uniqueId || "Người xem";
+                if (!(await isBanned(senderName))) {
+                    const safeName = await processText(senderName);
+                    const audio = await getGoogleAudio(`Bèo ơi, anh ${safeName} ghé chơi nè`);
+                    socket.emit('audio-data', { type: 'welcome', user: "Hệ thống", comment: `${senderName} vào`, audio });
+                }
+            } catch (err) { console.error("Lỗi sự kiện member:", err); }
         });
 
+        // 🌟 SỬA LỖI TẶNG QUÀ
         tiktok.on('gift', async (data) => {
-            if (data.repeatEnd && !(await isBanned(data.nickname))) {
-                const safeName = await processText(data.nickname);
-                const audio = await getGoogleAudio(`Cảm ơn ${safeName} đã tặng ${data.giftName}`);
-                socket.emit('audio-data', { type: 'gift', user: "QUÀ", comment: `${data.nickname} tặng ${data.giftName}`, audio });
-            }
+            try {
+                if (!data) return;
+                const senderName = data.nickname || data.uniqueId || "Người xem";
+                if (data.repeatEnd && !(await isBanned(senderName))) {
+                    const safeName = await processText(senderName);
+                    const giftName = data.giftName || "Quà";
+                    const audio = await getGoogleAudio(`Cảm ơn ${safeName} đã tặng ${giftName}`);
+                    socket.emit('audio-data', { type: 'gift', user: "QUÀ", comment: `${senderName} tặng ${giftName}`, audio });
+                }
+            } catch (err) { console.error("Lỗi sự kiện gift:", err); }
         });
     });
 
