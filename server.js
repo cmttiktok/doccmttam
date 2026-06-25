@@ -1,11 +1,12 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const TikTokLiveConnector = require('tiktok-live-connector');
 const path = require('path');
 
-// Đảm bảo lấy đúng constructor dù ở phiên bản cũ hay mới của thư viện
-const WebcastPushConnection = TikTokLiveConnector.WebcastPushConnection || TikTokLiveConnector;
+// Giải mã chính xác thư viện dù bị bọc bởi .default hay cấu trúc cũ
+const targetModule = require('tiktok-live-connector');
+const TikTokModule = targetModule.default || targetModule;
+const WebcastPushConnection = TikTokModule.WebcastPushConnection || TikTokModule;
 
 const app = express();
 const server = http.createServer(app);
