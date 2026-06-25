@@ -16,7 +16,6 @@ io.on('connection', (socket) => {
     let tiktokLive = null;
 
     socket.on('set-username', async (username) => {
-        // Nếu có kết nối cũ thì hủy hẳn trước khi tạo cái mới
         if (tiktokLive) {
             try {
                 tiktokLive.disconnect();
@@ -27,12 +26,18 @@ io.on('connection', (socket) => {
         try {
             socket.emit('status', `Đang kết nối đến phòng: ${username}...`);
 
-            // Khởi tạo đối tượng
+            // BỎ hoàn toàn apiKey lỗi của tik.tools, cấu hình kết nối trực tiếp giả lập trình duyệt
             tiktokLive = new TikTokLive(username, {
-                apiKey: "tk_f147cb9aa9f90ecde942e5877763f5123098a41e37cd1797"
+                clientParams: {
+                    client_language: "vi-VN",
+                    device_platform: "web"
+                },
+                requestHeaders: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
             });
 
-            // Đăng ký sự kiện NHẬN CHAT trước khi gọi lệnh connect
+            // Đăng ký nhận sự kiện chat
             tiktokLive.on('chat', (data) => {
                 socket.emit('comment-data', {
                     user: data.user?.nickname || data.user?.uniqueId || 'Ẩn danh',
@@ -40,16 +45,13 @@ io.on('connection', (socket) => {
                 });
             });
 
-            // Lắng nghe sự kiện mất kết nối từ TikTok
             tiktokLive.on('disconnect', () => {
                 socket.emit('status', 'Đứt kết nối hoặc Live Stream đã tắt.');
                 tiktokLive = null;
             });
 
-            // Gọi lệnh kết nối bất đồng bộ
+            // Thực hiện kết nối
             await tiktokLive.connect();
-            
-            // Nếu không ném ra lỗi, thông báo thành công
             socket.emit('status', `Đã kết nối thành công: ${username}`);
 
         } catch (err) {
