@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const { WebcastPushConnection } = require('tiktok-live-connector');
 const path = require('path');
 
 const app = express();
@@ -15,60 +16,41 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 io.on('connection', (socket) => {
     let tiktok;
 
-    socket.on('set-username', async (username) => {
+    socket.on('set-username', (username) => {
         if (tiktok) {
             tiktok.disconnect().catch(() => {});
         }
 
-        try {
-            // Nạp động module theo cơ chế bất đồng bộ bảo hiểm constructor
-            const connectorModule = await import('tiktok-live-connector');
-            
-            const WebcastPushConnection = connectorModule.default?.WebcastPushConnection || 
-                                          connectorModule.default || 
-                                          connectorModule.WebcastPushConnection || 
-                                          connectorModule;
-
-            if (typeof WebcastPushConnection !== 'function') {
-                throw new Error("Không thể trích xuất lớp kết nối.");
+        // Khởi tạo kết nối thẳng, bỏ qua việc ép Sign Server bị lỗi 403
+        tiktok = new WebcastPushConnection(username, {
+            clientParams: {
+                "app_language": "en-US",
+                "webcast_language": "en-US"
+            },
+            requestOptions: {
+                timeout: 10000
             }
+        });
 
-            // Sử dụng chính xác API Key Euler Stream của bạn để vượt tường lửa ổn định
-            tiktok = new WebcastPushConnection(username, {
-                clientParams: {
-                    "app_language": "en-US",
-                    "webcast_language": "en-US"
-                },
-                requestOptions: {
-                    timeout: 10000
-                },
-                signApiKey: "euler_NmJmODEyMmZlOTFiNzI2NmU2YTc0YjlmYTM2Nzg4NWIyMWIyMWI4NTA4ODAyMGZjZmQyMjNk"
+        tiktok.connect()
+            .then(() => socket.emit('status', `Đã kết nối: ${username}`))
+            .catch((err) => {
+                console.error("Lỗi kết nối TikTok:", err.message);
+                socket.emit('status', `Kết nối thất bại: ${err.message}`);
             });
 
-            tiktok.connect()
-                .then(() => socket.emit('status', `Đã kết nối: ${username}`))
-                .catch((err) => {
-                    console.error("Lỗi kết nối TikTok:", err.message);
-                    socket.emit('status', `Kết nối thất bại: ${err.message}`);
-                });
-
-            // Chỉ bắt duy nhất sự kiện bình luận (chat)
-            tiktok.on('chat', (data) => {
-                socket.emit('comment-data', {
-                    user: data.nickname || data.uniqueId,
-                    comment: data.comment
-                });
+        // Chỉ bắt duy nhất sự kiện bình luận (chat)
+        tiktok.on('chat', (data) => {
+            socket.emit('comment-data', {
+                user: data.nickname || data.uniqueId,
+                comment: data.comment
             });
+        });
 
-            // Xử lý khi ngắt kết nối live stream từ phía TikTok
-            tiktok.on('disconnected', () => {
-                socket.emit('status', 'Đứt kết nối live từ TikTok.');
-            });
-
-        } catch (initErr) {
-            console.error("Lỗi cấu trúc khởi tạo:", initErr.message);
-            socket.emit('status', `Lỗi hệ thống: ${initErr.message}`);
-        }
+        // Xử lý khi ngắt kết nối live stream từ phía TikTok
+        tiktok.on('disconnected', () => {
+            socket.emit('status', 'Đứt kết nối live từ TikTok.');
+        });
     });
 
     socket.on('disconnect', () => {
