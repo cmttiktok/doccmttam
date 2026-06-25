@@ -1,0 +1,15 @@
+{
+  "name": "tiktok-live-comments-events",
+  "version": "2.1.0",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "http": "^0.0.1-security",
+    "socket.io": "^4.7.2",
+    "tiktok-live-events": "latest",
+    "path": "^0.12.7"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
