@@ -11,15 +11,19 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
+// File lưu trữ dữ liệu nhắc nhở dạng JSON
 const REMINDERS_FILE = path.join(__dirname, 'reminders.json');
 
+// Khởi tạo file nếu chưa tồn tại
 if (!fs.existsSync(REMINDERS_FILE)) {
     fs.writeFileSync(REMINDERS_FILE, JSON.stringify({}));
 }
 
+// Trả về giao diện chính và giao diện admin
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
+// API lấy và lưu danh sách nhắc nhở
 app.get('/api/reminders', (req, res) => {
     const data = fs.readFileSync(REMINDERS_FILE, 'utf8');
     res.json(JSON.parse(data));
