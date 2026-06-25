@@ -10,33 +10,29 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
-// Trả về giao diện chính cho người dùng
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 io.on('connection', (socket) => {
-    let tiktokLive;
+    let tiktokLive = null;
 
     socket.on('set-username', async (username) => {
-        // Nếu đang có kết nối cũ, tiến hành ngắt kết nối trước khi nhận ID mới
+        // Nếu có kết nối cũ thì hủy hẳn trước khi tạo cái mới
         if (tiktokLive) {
             try {
                 tiktokLive.disconnect();
+                tiktokLive = null;
             } catch (e) {}
         }
 
         try {
             socket.emit('status', `Đang kết nối đến phòng: ${username}...`);
 
-            // Khởi tạo kết nối với mã API Key cá nhân của bạn để xóa hoàn toàn giới hạn ẩn danh
+            // Khởi tạo đối tượng
             tiktokLive = new TikTokLive(username, {
                 apiKey: "tk_f147cb9aa9f90ecde942e5877763f5123098a41e37cd1797"
             });
 
-            // Kích hoạt lệnh kết nối
-            await tiktokLive.connect();
-            socket.emit('status', `Đã kết nối thành công: ${username}`);
-
-            // Lắng nghe duy nhất sự kiện bình luận (chat) từ livestream
+            // Đăng ký sự kiện NHẬN CHAT trước khi gọi lệnh connect
             tiktokLive.on('chat', (data) => {
                 socket.emit('comment-data', {
                     user: data.user?.nickname || data.user?.uniqueId || 'Ẩn danh',
@@ -44,18 +40,25 @@ io.on('connection', (socket) => {
                 });
             });
 
-            // Lắng nghe khi livestream kết thúc hoặc mất kết nối từ phía TikTok
+            // Lắng nghe sự kiện mất kết nối từ TikTok
             tiktokLive.on('disconnect', () => {
                 socket.emit('status', 'Đứt kết nối hoặc Live Stream đã tắt.');
+                tiktokLive = null;
             });
 
+            // Gọi lệnh kết nối bất đồng bộ
+            await tiktokLive.connect();
+            
+            // Nếu không ném ra lỗi, thông báo thành công
+            socket.emit('status', `Đã kết nối thành công: ${username}`);
+
         } catch (err) {
-            console.error("Lỗi TikTokLive:", err.message);
+            console.error("Lỗi kết nối TikTokLive:", err.message);
             socket.emit('status', `Kết nối thất bại: ${err.message}`);
+            tiktokLive = null;
         }
     });
 
-    // Khi người dùng tắt tab hoặc F5, tự động hủy kết nối để tiết kiệm tài nguyên
     socket.on('disconnect', () => {
         if (tiktokLive) {
             try {
@@ -65,6 +68,5 @@ io.on('connection', (socket) => {
     });
 });
 
-// Cấu hình PORT linh hoạt tương thích hoàn toàn với hạ tầng Render
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Hệ thống chạy mượt mà tại port ${PORT}`));
