@@ -6,8 +6,7 @@
     "express": "^4.18.2",
     "http": "^0.0.1-security",
     "socket.io": "^4.7.2",
-    "tiktok-live-connector": "^0.9.5",
-    "https-proxy-agent": "^7.0.2",
+    "tiktok-live-events": "latest",
     "path": "^0.12.7"
   },
   "scripts": {
