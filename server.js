@@ -1,7 +1,8 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { TikTokLive } = require('tiktok-live-events');
+// CHUYỂN ĐỔI: Sử dụng thư viện gốc kết nối trực tiếp mạnh mẽ hơn
+const { WebcastPushConnection } = require('tiktok-live-connector');
 const path = require('path');
 
 const app = express();
@@ -12,89 +13,82 @@ app.use(express.json());
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// BIẾN TOÀN CỤC (GLOBAL): Đưa ra ngoài để dùng chung cho tất cả các thiết bị kết nối
-let tiktokLive = null;
-let currentRoom = null; // Lưu tên phòng đang kết nối thực tế
+// BIẾN TOÀN CỤC (GLOBAL): Quản lý luồng duy nhất cho toàn bộ thiết bị
+let tiktokConnect = null;
+let currentRoom = null;
 
 io.on('connection', (socket) => {
 
-    // Khi một thiết bị mới vừa mở Web, tự động gửi trạng thái hiện tại của Server cho thiết bị đó biết
-    if (tiktokLive) {
+    // Gửi trạng thái hiện tại cho thiết bị vừa mới truy cập
+    if (tiktokConnect && tiktokConnect.isConnected) {
         socket.emit('status', `Đang chia sẻ luồng dữ liệu từ phòng: ${currentRoom}`);
     } else {
         socket.emit('status', 'Chưa kết nối');
     }
 
     socket.on('set-username', async (username) => {
-        // NẾU PHÒNG NÀY ĐÃ ĐƯỢC KẾT NỐI TRƯỚC ĐÓ VÀ ĐANG CHẠY: Không tạo kết nối mới để tránh bị khóa IP
-        if (tiktokLive && currentRoom === username) {
+        // Nếu phòng này đang chạy mượt mà, giữ nguyên không tạo lại
+        if (tiktokConnect && tiktokConnect.isConnected && currentRoom === username) {
             socket.emit('status', `Đã kết nối thành công: ${username} (Dùng chung luồng)`);
             return;
         }
 
-        // Nếu yêu cầu kết nối phòng mới hoàn toàn, tiến hành ngắt phòng cũ (nếu có)
-        if (tiktokLive) {
+        // Ngắt luồng kết nối cũ nếu đổi phòng
+        if (tiktokConnect) {
             try {
-                tiktokLive.disconnect();
-                tiktokLive = null;
+                tiktokConnect.disconnect();
+                tiktokConnect = null;
                 currentRoom = null;
             } catch (e) {}
         }
 
         try {
-            // Thông báo cho TẤT CẢ các thiết bị đang xem biết hệ thống đang chuyển phòng
-            io.emit('status', `Đang kết nối đến phòng: ${username}...`);
+            io.emit('status', `Đang kết nối trực tiếp đến phòng: ${username}...`);
 
-            tiktokLive = new TikTokLive(username, {
-                clientParams: {
-                    client_language: "vi-VN",
-                    device_platform: "web"
+            // Khởi tạo bộ kết nối trực tiếp bằng Webcast API của TikTok
+            tiktokConnect = new WebcastPushConnection(username, {
+                processInitialData: false,
+                enableExtendedGiftInfo: false,
+                requestOptions: {
+                    timeout: 10000
                 },
-                requestHeaders: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                clientParams: {
+                    "app_language": "vi-VN",
+                    "webcast_language": "vi-VN"
                 }
             });
 
             currentRoom = username;
 
-            // Đăng ký nhận sự kiện chat từ TikTok
-            tiktokLive.on('chat', (data) => {
-                // Thay vì gửi cho 1 socket cá nhân, ta dùng io.emit để PHÁT SÓNG cho tất cả các thiết bị cùng nhận
+            // Đăng ký nhận sự kiện Chat từ thư viện gốc
+            tiktokConnect.on('chat', (data) => {
+                // Phát sóng comment cho toàn bộ thiết bị
                 io.emit('comment-data', {
-                    user: data.user?.nickname || data.user?.uniqueId || 'Ẩn danh',
+                    user: data.nickname || data.uniqueId || 'Ẩn danh',
                     comment: data.comment
                 });
             });
 
-            tiktokLive.on('disconnect', () => {
+            tiktokConnect.on('disconnected', () => {
                 io.emit('status', 'Đứt kết nối hoặc Live Stream đã tắt.');
-                tiktokLive = null;
+                tiktokConnect = null;
                 currentRoom = null;
             });
 
-            // Thực hiện kết nối thực tế với TikTok
-            await tiktokLive.connect();
-            
-            // Thông báo thành công cho TẤT CẢ mọi người đang mở ứng dụng
+            // Tiến hành kết nối trực tiếp đến TikTok
+            await tiktokConnect.connect();
             io.emit('status', `Đã kết nối thành công: ${username}`);
 
         } catch (err) {
-            console.error("Lỗi kết nối TikTokLive:", err.message);
-            // Nếu lỗi do hết lượt cào/Rate limit từ bên thứ 3, thông báo hiển thị trực quan
-            let errorMsg = err.message;
-            if (errorMsg.includes("hourly cap") || errorMsg.includes("Rate limit")) {
-                errorMsg = "Bị TikTok giới hạn lượt cào (Rate limit). Vui lòng thử lại sau ít phút!";
-            }
-            socket.emit('status', `Kết nối thất bại: ${errorMsg}`);
-            tiktokLive = null;
+            console.error("Lỗi kết nối TikTok Live Connector:", err.message);
+            socket.emit('status', `Kết nối thất bại: ${err.message}`);
+            tiktokConnect = null;
             currentRoom = null;
         }
     });
 
-    // BỎ logic ngắt kết nối tiktokLive khi socket disconnect. 
-    // Giờ đây, một người tắt trình duyệt/điện thoại thì Server vẫn giữ kết nối để phục vụ những người còn lại.
     socket.on('disconnect', () => {
-        // Để trống nhằm giữ kết nối hoạt động liên tục trên Server
+        // Giữ luồng hoạt động liên tục trên Server kể cả khi có thiết bị tắt trình duyệt
     });
 });
 
