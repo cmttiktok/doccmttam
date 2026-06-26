@@ -10,15 +10,16 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
+// Định tuyến giao diện
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// Quản lý biến kết nối toàn cục
+// Biến lưu trữ luồng kết nối toàn cục để quản lý phiên làm việc
 let tiktokLive = null;
 let currentRoom = null;
 
 io.on('connection', (socket) => {
     
-    // Gửi trạng thái hiện tại cho client mới kết nối
+    // Gửi trạng thái kết nối cho thiết bị vừa mới mở trang web
     if (tiktokLive && tiktokLive.getState().isConnected) {
         socket.emit('status', `Đang chia sẻ luồng dữ liệu từ phòng: ${currentRoom}`);
     } else {
@@ -26,13 +27,13 @@ io.on('connection', (socket) => {
     }
 
     socket.on('set-username', async (username) => {
-        // Nếu đã kết nối đúng phòng đó rồi thì dùng chung luồng, không kết nối lại
+        // Nếu đã kết nối đúng tài khoản đang livestream rồi thì giữ nguyên, dùng chung luồng dữ liệu
         if (tiktokLive && currentRoom === username && tiktokLive.getState().isConnected) {
             socket.emit('status', `Đã kết nối thành công: ${username} (Luồng chung)`);
             return;
         }
 
-        // Ngắt kết nối cũ nếu có để tránh trùng lặp luồng ngầm
+        // Luôn giải phóng luồng kết nối cũ để giải phóng tài nguyên bộ nhớ trên Render
         if (tiktokLive) {
             try {
                 tiktokLive.disconnect();
@@ -44,7 +45,7 @@ io.on('connection', (socket) => {
         try {
             socket.emit('status', `Đang kết nối đến phòng: ${username}...`);
 
-            // Khởi tạo kết nối trực tiếp thuần túy
+            // Khởi tạo kết nối trực tiếp đến hệ thống TikTok Webcast không qua API trung gian
             tiktokLive = new WebcastConnection(username, {
                 enableExtendedConfig: true,
                 requestOptions: {
@@ -54,7 +55,7 @@ io.on('connection', (socket) => {
 
             currentRoom = username;
 
-            // Nhận sự kiện chat từ thư viện mới
+            // Nhận sự kiện bình luận (chat) và đẩy qua Socket.io về giao diện người dùng
             tiktokLive.on('chat', (data) => {
                 io.emit('comment-data', {
                     user: data.nickname || data.uniqueId || 'Ẩn danh',
@@ -62,7 +63,7 @@ io.on('connection', (socket) => {
                 });
             });
 
-            // Xử lý khi live bị ngắt hoặc tắt stream
+            // Lắng nghe sự kiện luồng live bị kết thúc hoặc rớt kết nối mạng
             tiktokLive.on('disconnected', () => {
                 io.emit('status', 'Đứt kết nối hoặc Live Stream đã tắt.');
                 tiktokLive = null;
@@ -87,6 +88,6 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {});
 });
 
-// Render yêu cầu binding cổng qua PORT môi trường hoặc mặc định 10000 thay vì 3000
+// Đồng bộ cổng PORT động của môi trường Render (bắt buộc phải có process.env.PORT)
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`🚀 Hệ thống chạy mượt mà tại port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Hệ thống hoạt động độc lập tại port ${PORT}`));
