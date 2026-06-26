@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BÈO LIVE COMMENTS</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
@@ -16,69 +16,74 @@
         body { 
             font-family: 'Quicksand', sans-serif; 
             background: var(--bg); 
-            margin: 0; padding: 10px; 
+            margin: 0; padding: 15px; 
             display: flex; flex-direction: column; align-items: center; 
-            min-height: 100vh;
+            gap: 15px;
         }
-        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; }
-        
-        /* Widget Đồng hồ mới */
-        .clock-card {
-            background: linear-gradient(135deg, var(--pink), #ff6b8b);
-            color: white; padding: 12px; border-radius: 15px;
-            text-align: center; box-shadow: 0 4px 15px rgba(254,44,85,0.2);
-        }
-        #digitalClock { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
-        #digitalDate { font-size: 13px; opacity: 0.9; margin-top: 2px; }
-
+        .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
         .card { 
-            background: var(--panel); padding: 15px; border-radius: 20px; 
-            border: 2px solid var(--pink); box-shadow: 0 6px 20px rgba(254,44,85,0.08);
+            background: var(--panel); padding: 20px; border-radius: 20px; 
+            border: 2px solid var(--pink); box-shadow: 0 8px 25px rgba(254,44,85,0.1);
             text-align: center;
+            position: relative;
         }
-        input[type="text"] {
-            width: 100%; padding: 14px; border-radius: 12px;
+        input {
+            width: 100%; padding: 12px; border-radius: 12px;
             border: 1px solid #ddd; background: #f8f9fa;
             font-family: inherit; font-size: 16px; text-align: center; margin-bottom: 12px;
-            outline: none; transition: border 0.2s;
         }
-        input[type="text"]:focus { border-color: var(--pink); }
-        
         button {
             width: 100%; padding: 14px; border: none; border-radius: 12px;
             background: var(--pink); color: white; font-weight: bold;
             font-size: 16px; cursor: pointer; transition: 0.2s;
-            -webkit-tap-highlight-color: transparent;
         }
-        button:hover { opacity: 0.9; }
-        button:active { transform: scale(0.98); }
+        button:hover { opacity: 0.9; transform: scale(0.98); }
+        .status-text { font-size: 13px; color: #666; margin-top: 8px; display: block; }
         
-        .status-text { font-size: 13px; color: #666; margin-top: 8px; display: block; font-weight: 600; }
-        
-        /* Bộ điều khiển cỡ chữ */
-        .font-control {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 10px; margin-bottom: 10px; background: #fff5f7;
-            padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--pink);
+        /* Cấu trúc tiêu đề khung chat */
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
-        .font-control label { font-size: 13px; color: #555; font-weight: bold; white-space: nowrap; }
-        .font-control input[type="range"] { 
-            flex: 1; accent-color: var(--pink); cursor: pointer; height: 6px; 
+        .chat-title {
+            margin: 0; color: var(--pink); font-size: 16px; font-weight: 700;
         }
-        
-        /* Hộp chat tối ưu mobile */
+        /* Nút bung toàn màn hình nhỏ gọn */
+        .btn-fullscreen {
+            background: #333; color: white; padding: 6px 12px; 
+            font-size: 12px; border-radius: 8px; width: auto; margin: 0;
+        }
+
         .chat-box {
-            width: 100%; height: calc(100vh - 340px); min-height: 350px; max-height: 550px;
-            background: #fff; border-radius: 15px; border: 1px solid #eee;
-            padding: 12px; overflow-y: auto; text-align: left;
-            display: flex; flex-direction: column; gap: 8px;
+            width: 100%; height: 450px; background: #fff;
+            border-radius: 15px; border: 1px solid #eee;
+            padding: 15px; overflow-y: auto; text-align: left;
+            display: flex; flex-direction: column; gap: 10px;
+            transition: all 0.3s ease;
         }
-        .msg { font-size: 16px; line-height: 1.4; animation: fadeIn 0.2s ease; word-break: break-word; }
+        .msg { font-size: 15px; line-height: 1.4; animation: fadeIn 0.3s ease; }
         .user { color: var(--pink); font-weight: 700; margin-right: 5px; }
         .txt { color: #333; }
         
+        /* CSS khi kích hoạt chế độ Toàn màn hình tiêu chuẩn trình duyệt */
+        .chat-box:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0px !important;
+            padding: 30px !important;
+            box-sizing: border-box;
+            background: #ffffff !important;
+        }
+        /* Tăng cỡ chữ khi ở chế độ toàn màn hình để nhìn từ xa rõ hơn */
+        .chat-box:fullscreen .msg {
+            font-size: 24px !important;
+            margin-bottom: 5px;
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
+            from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
     </style>
@@ -86,25 +91,17 @@
 <body>
 
     <div class="container">
-        <div class="clock-card">
-            <div id="digitalClock">00:00:00</div>
-            <div id="digitalDate">Thứ ..., Ngày --/--/----</div>
-        </div>
-
         <div class="card">
             <input type="text" id="username" value="chipham1" placeholder="Nhập tên tài khoản TikTok Live">
             <button id="btnConnect">KẾT NỐI LIVE</button>
             <span class="status-text" id="status">Chưa kết nối</span>
         </div>
 
-        <div class="card" style="padding: 12px;">
-            <h3 style="margin: 0 0 10px 0; color: var(--pink); font-size: 15px;">💬 BÌNH LUẬN TRỰC TIẾP</h3>
-            
-            <div class="font-control">
-                <label for="fontSizeSlider">Cỡ chữ: <span id="fontSizeVal">16</span>px</label>
-                <input type="range" id="fontSizeSlider" min="14" max="28" value="16">
+        <div class="card" style="padding: 15px;">
+            <div class="chat-header">
+                <h3 class="chat-title">💬 BÌNH LUẬN TRỰC TIẾP</h3>
+                <button id="btnFullscreen" class="btn-fullscreen">📺 TOÀN MÀN HÌNH</button>
             </div>
-
             <div class="chat-box" id="chatBox"></div>
         </div>
     </div>
@@ -115,71 +112,35 @@
         const usernameInput = document.getElementById('username');
         const statusText = document.getElementById('status');
         const chatBox = document.getElementById('chatBox');
-        
-        // Các thành phần giao diện mới thêm
-        const fontSizeSlider = document.getElementById('fontSizeSlider');
-        const fontSizeVal = document.getElementById('fontSizeVal');
-        let currentFontSize = 16;
-        let wakeLock = null;
+        const btnFullscreen = document.getElementById('btnFullscreen');
 
-        // 1. Logic Đồng hồ tự động cập nhật mỗi giây
-        function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('digitalClock').innerText = `${hours}:${minutes}:${seconds}`;
-
-            const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-            const dayName = days[now.getDay()];
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-            document.getElementById('digitalDate').innerText = `${dayName}, Ngày ${day}/${month}/${year}`;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // 2. Logic Điều chỉnh kích thước chữ nhanh chóng
-        fontSizeSlider.oninput = (e) => {
-            currentFontSize = e.target.value;
-            fontSizeVal.innerText = currentFontSize;
-            
-            // Áp dụng trực tiếp lên tất cả các dòng text hiện tại và tương lai trong chatBox
-            const messages = chatBox.getElementsByClassName('msg');
-            for(let msg of messages) {
-                msg.style.fontSize = currentFontSize + 'px';
-            }
-        };
-
-        // 3. Logic Giữ màn hình luôn sáng (Wake Lock)
-        async function requestWakeLock() {
-            if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Màn hình đang được giữ sáng chủ động...');
-                } catch (err) {
-                    console.warn(`Không thể kích hoạt giữ sáng: ${err.message}`);
-                }
-            }
-        }
-
-        // Tự động yêu cầu lại quyền giữ sáng khi quay lại tab (nếu bị mất focus)
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
-        });
-
-        // 4. Logic Xử lý sự kiện chính (Giữ nguyên gốc)
-        btnConnect.onclick = async () => {
+        btnConnect.onclick = () => {
             const user = usernameInput.value.trim();
             if(!user) return alert('Vui lòng nhập ID!');
             socket.emit('set-username', user);
-            
-            // Kích hoạt giữ sáng ngay khi người dùng nhấn tương tác kết nối live
-            await requestWakeLock();
         };
+
+        // Xử lý sự kiện bung/thoát chế độ Toàn màn hình
+        btnFullscreen.onclick = () => {
+            if (!document.fullscreenElement) {
+                // Nếu chưa mở, bung khung chatBox lên toàn màn hình
+                chatBox.requestFullscreen().catch(err => {
+                    alert(`Không thể mở toàn màn hình: ${err.message}`);
+                });
+            } else {
+                // Nếu đang mở, bấm lại sẽ thoát
+                document.exitFullscreen();
+            }
+        };
+
+        // Lắng nghe thay đổi trạng thái fullscreen để đổi chữ trên nút bấm nếu cần
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                btnFullscreen.innerText = "❌ THOÁT";
+            } else {
+                btnFullscreen.innerText = "📺 TOÀN MÀN HÌNH";
+            }
+        });
 
         socket.on('status', (msg) => {
             statusText.innerText = msg;
@@ -188,8 +149,6 @@
         socket.on('comment-data', (data) => {
             const msgDiv = document.createElement('div');
             msgDiv.className = 'msg';
-            // Áp dụng ngay kích thước chữ hiện tại đang được chọn trên thanh trượt
-            msgDiv.style.fontSize = currentFontSize + 'px';
             msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
             chatBox.appendChild(msgDiv);
             
