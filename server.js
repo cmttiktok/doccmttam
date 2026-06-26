@@ -12,13 +12,13 @@ app.use(express.json());
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// BIẾN TOÀN CỤC (GLOBAL): Đưa luồng kết nối ra ngoài dùng chung cho mọi thiết bị
+// BIẾN TOÀN CỤC (GLOBAL)
 let tiktokLive = null;
 let currentRoom = null;
 
 io.on('connection', (socket) => {
 
-    // Nếu hệ thống đang có luồng chạy sẵn, báo trạng thái cho thiết bị mới vào biết luôn
+    // Gửi trạng thái hiện tại cho thiết bị mới vào
     if (tiktokLive) {
         socket.emit('status', `Đang chia sẻ luồng dữ liệu từ phòng: ${currentRoom}`);
     } else {
@@ -26,23 +26,23 @@ io.on('connection', (socket) => {
     }
 
     socket.on('set-username', async (username) => {
-        // CHỐNG SPAM REQUEST: Nếu phòng này đang kết nối và chạy mượt, không làm gì cả
+        // NẾU bấm kết nối lại chính phòng đó khi luồng đang chạy ổn định
         if (tiktokLive && currentRoom === username) {
             socket.emit('status', `Đã kết nối thành công: ${username} (Dùng chung luồng)`);
             return;
         }
 
-        // Tự động ngắt kết nối phòng cũ nếu đổi tên phòng mới
+        // GIẢI PHÓNG HOÀN TOÀN LUỒNG CŨ (Tránh tình trạng kẹt kết nối rác khi Idol tắt/bật lại live)
         if (tiktokLive) {
             try {
+                console.log("Đang giải phóng kết nối cũ...");
                 tiktokLive.disconnect();
-                tiktokLive = null;
-                currentRoom = null;
             } catch (e) {}
+            tiktokLive = null;
+            currentRoom = null;
         }
 
         try {
-            // Phát sóng trạng thái đang kết nối cho TẤT CẢ các thiết bị đang mở Web
             io.emit('status', `Đang kết nối đến phòng: ${username}...`);
 
             tiktokLive = new TikTokLive(username, {
@@ -57,32 +57,29 @@ io.on('connection', (socket) => {
 
             currentRoom = username;
 
-            // Đăng ký nhận sự kiện chat
             tiktokLive.on('chat', (data) => {
-                // SỬA ĐỔI QUAN TRỌNG: Dùng io.emit để PHÁT SÓNG comment cho tất cả các máy cùng xem
                 io.emit('comment-data', {
                     user: data.user?.nickname || data.user?.uniqueId || 'Ẩn danh',
                     comment: data.comment
                 });
             });
 
+            // Khi tín hiệu từ TikTok báo đứt luồng (Idol tắt live), xóa sạch biến lập tức
             tiktokLive.on('disconnect', () => {
+                console.log("Luồng kết nối TikTok đã bị ngắt.");
                 io.emit('status', 'Đứt kết nối hoặc Live Stream đã tắt.');
                 tiktokLive = null;
                 currentRoom = null;
             });
 
-            // Thực hiện kết nối thực tế
             await tiktokLive.connect();
-            
-            // Thông báo kết nối thành công cho tất cả mọi người cùng biết
             io.emit('status', `Đã kết nối thành công: ${username}`);
 
         } catch (err) {
             console.error("Lỗi kết nối TikTokLive:", err.message);
             let msg = err.message;
             if (msg.includes("hourly cap") || msg.includes("Rate limit")) {
-                msg = "Đang tạm thời hết hạn mức cào miễn phí. Vui lòng đợi vài phút rồi bấm lại!";
+                msg = "Hết hạn mức cào tự do. Hãy đợi vài phút hoặc đổi tên phòng để thử lại!";
             }
             socket.emit('status', `Kết nối thất bại: ${msg}`);
             tiktokLive = null;
@@ -90,7 +87,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Giữ nguyên luồng chạy trên server kể cả khi có người tắt trình duyệt
     socket.on('disconnect', () => {});
 });
 
