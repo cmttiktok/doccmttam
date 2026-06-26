@@ -10,42 +10,29 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
-// Trả về trang giao diện chính
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// BIẾN TOÀN CỤC (GLOBAL)
+// Quản lý biến kết nối toàn cục
 let tiktokLive = null;
 let currentRoom = null;
-let currentEventText = ""; // Lưu trữ chữ chạy từ admin
-
-// API nhận sự kiện chạy chữ từ admin
-app.post('/set-event', (req, res) => {
-    const { event } = req.body;
-    currentEventText = event || "";
-    io.emit('update-event', currentEventText);
-    return res.json({ success: true, message: "Cập nhật sự kiện thành công!" });
-});
 
 io.on('connection', (socket) => {
-
-    // Đồng bộ chữ chạy khi có thiết bị mới kết nối vào hệ thống
-    socket.emit('update-event', currentEventText);
     
-    // Gửi trạng thái kết nối hiện tại cho thiết bị mới vào
+    // Gửi trạng thái hiện tại cho client mới kết nối
     if (tiktokLive && tiktokLive.getState().isConnected) {
-        socket.emit('status', { success: true, msg: `Đang chia sẻ luồng dữ liệu từ phòng: ${currentRoom}` });
+        socket.emit('status', `Đang chia sẻ luồng dữ liệu từ phòng: ${currentRoom}`);
     } else {
-        socket.emit('status', { success: false, msg: 'Chưa kết nối' });
+        socket.emit('status', 'Chưa kết nối');
     }
 
     socket.on('set-username', async (username) => {
-        // Nếu thiết bị yêu cầu kết nối đúng phòng đang chạy và hoạt động ổn định
+        // Nếu đã kết nối đúng phòng đó rồi thì dùng chung luồng, không kết nối lại
         if (tiktokLive && currentRoom === username && tiktokLive.getState().isConnected) {
-            socket.emit('status', { success: true, msg: `Đã kết nối thành công: ${username} (Dùng chung luồng)` });
+            socket.emit('status', `Đã kết nối thành công: ${username} (Luồng chung)`);
             return;
         }
 
-        // GIẢI PHÓNG HOÀN TOÀN LUỒNG CŨ (Tránh kẹt cổng hoặc lỗi phòng rác)
+        // Ngắt kết nối cũ nếu có để tránh trùng lặp luồng ngầm
         if (tiktokLive) {
             try {
                 tiktokLive.disconnect();
@@ -55,9 +42,9 @@ io.on('connection', (socket) => {
         }
 
         try {
-            io.emit('status', { success: false, msg: `Đang kết nối đến phòng: ${username}...` });
+            socket.emit('status', `Đang kết nối đến phòng: ${username}...`);
 
-            // Khởi tạo bộ kết nối trực tiếp đến Webcast API của TikTok không qua trung gian
+            // Khởi tạo kết nối trực tiếp thuần túy
             tiktokLive = new WebcastConnection(username, {
                 enableExtendedConfig: true,
                 requestOptions: {
@@ -67,7 +54,7 @@ io.on('connection', (socket) => {
 
             currentRoom = username;
 
-            // Đăng ký nhận sự kiện chat từ thư viện mới
+            // Nhận sự kiện chat từ thư viện mới
             tiktokLive.on('chat', (data) => {
                 io.emit('comment-data', {
                     user: data.nickname || data.uniqueId || 'Ẩn danh',
@@ -75,24 +62,23 @@ io.on('connection', (socket) => {
                 });
             });
 
-            // Khi Idol tắt live hoặc bị đứt kết nối từ phía TikTok
+            // Xử lý khi live bị ngắt hoặc tắt stream
             tiktokLive.on('disconnected', () => {
-                io.emit('status', { success: false, msg: 'Đứt kết nối hoặc Live Stream đã tắt.' });
+                io.emit('status', 'Đứt kết nối hoặc Live Stream đã tắt.');
                 tiktokLive = null;
                 currentRoom = null;
             });
 
-            // Tiến hành kết nối
             await tiktokLive.connect();
-            io.emit('status', { success: true, msg: `Đã kết nối thành công: ${username}` });
+            io.emit('status', `Đã kết nối thành công: ${username}`);
 
         } catch (err) {
             console.error("Lỗi kết nối TikTok Live:", err.message);
-            let userFriendlyMsg = err.message;
+            let msgError = err.message;
             if (err.message.includes("not live") || err.message.includes("404")) {
-                userFriendlyMsg = `@${username} hiện không trực tuyến hoặc sai ID.`;
+                msgError = "Tài khoản hiện không livestream hoặc sai ID.";
             }
-            socket.emit('status', { success: false, msg: `Kết nối thất bại: ${userFriendlyMsg}` });
+            socket.emit('status', `Kết nối thất bại: ${msgError}`);
             tiktokLive = null;
             currentRoom = null;
         }
@@ -101,5 +87,6 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {});
 });
 
-const PORT = process.env.PORT || 10000; // Đồng bộ theo port nhận diện của Render
-server.listen(PORT, () => console.log(`🚀 Hệ thống độc lập hoạt động mượt mà tại port ${PORT}`));
+// Render yêu cầu binding cổng qua PORT môi trường hoặc mặc định 10000 thay vì 3000
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => console.log(`🚀 Hệ thống chạy mượt mà tại port ${PORT}`));
