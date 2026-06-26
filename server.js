@@ -1,8 +1,9 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-// CHUYỂN ĐỔI: Sử dụng thư viện gốc kết nối trực tiếp mạnh mẽ hơn
-const { WebcastPushConnection } = require('tiktok-live-connector');
+const { TikTokLiveConnector } = require('tiktok-live-connector');
+// THÊM: Thư viện điều hướng qua Proxy để vượt tường lửa TikTok
+const { HttpsProxyAgent } = require('https-proxy-agent'); 
 const path = require('path');
 
 const app = express();
@@ -13,27 +14,30 @@ app.use(express.json());
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// BIẾN TOÀN CỤC (GLOBAL): Quản lý luồng duy nhất cho toàn bộ thiết bị
 let tiktokConnect = null;
 let currentRoom = null;
 
+// ==========================================
+// CẤU HÌNH PROXY CỦA BẠN TẠI ĐÂY
+// Định dạng: http://username:password@ip:port hoặc http://ip:port (nếu không có mật khẩu)
+// Hãy thay thế bằng một Proxy sạch (Ưu tiên IP Việt Nam) để vượt chặn IP của Render
+const PROXY_URL = ""; 
+// ==========================================
+
 io.on('connection', (socket) => {
 
-    // Gửi trạng thái hiện tại cho thiết bị vừa mới truy cập
-    if (tiktokConnect && tiktokConnect.isConnected) {
+    if (tiktokConnect && tiktokConnect.connected) {
         socket.emit('status', `Đang chia sẻ luồng dữ liệu từ phòng: ${currentRoom}`);
     } else {
         socket.emit('status', 'Chưa kết nối');
     }
 
     socket.on('set-username', async (username) => {
-        // Nếu phòng này đang chạy mượt mà, giữ nguyên không tạo lại
-        if (tiktokConnect && tiktokConnect.isConnected && currentRoom === username) {
+        if (tiktokConnect && tiktokConnect.connected && currentRoom === username) {
             socket.emit('status', `Đã kết nối thành công: ${username} (Dùng chung luồng)`);
             return;
         }
 
-        // Ngắt luồng kết nối cũ nếu đổi phòng
         if (tiktokConnect) {
             try {
                 tiktokConnect.disconnect();
@@ -45,24 +49,25 @@ io.on('connection', (socket) => {
         try {
             io.emit('status', `Đang kết nối trực tiếp đến phòng: ${username}...`);
 
-            // Khởi tạo bộ kết nối trực tiếp bằng Webcast API của TikTok
-            tiktokConnect = new WebcastPushConnection(username, {
-                processInitialData: false,
+            // Thiết lập cấu hình request bao gồm cả Proxy nếu có
+            const connectorOptions = {
                 enableExtendedGiftInfo: false,
                 requestOptions: {
                     timeout: 10000
-                },
-                clientParams: {
-                    "app_language": "vi-VN",
-                    "webcast_language": "vi-VN"
                 }
-            });
+            };
 
+            // Nếu bạn đã điền PROXY_URL, hệ thống sẽ tự động gán vào luồng kết nối
+            if (PROXY_URL) {
+                const agent = new HttpsProxyAgent(PROXY_URL);
+                connectorOptions.requestOptions.agent = agent;
+                console.log("🚀 Hệ thống đang định tuyến kết nối qua Proxy...");
+            }
+
+            tiktokConnect = new TikTokLiveConnector(username, connectorOptions);
             currentRoom = username;
 
-            // Đăng ký nhận sự kiện Chat từ thư viện gốc
             tiktokConnect.on('chat', (data) => {
-                // Phát sóng comment cho toàn bộ thiết bị
                 io.emit('comment-data', {
                     user: data.nickname || data.uniqueId || 'Ẩn danh',
                     comment: data.comment
@@ -75,22 +80,23 @@ io.on('connection', (socket) => {
                 currentRoom = null;
             });
 
-            // Tiến hành kết nối trực tiếp đến TikTok
             await tiktokConnect.connect();
             io.emit('status', `Đã kết nối thành công: ${username}`);
 
         } catch (err) {
-            console.error("Lỗi kết nối TikTok Live Connector:", err.message);
-            socket.emit('status', `Kết nối thất bại: ${err.message}`);
+            console.error("Lỗi kết nối TikTok Live:", err.message);
+            let userFriendlyMsg = err.message;
+            if (userFriendlyMsg.includes("room_id") || userFriendlyMsg.includes("blocked")) {
+                userFriendlyMsg = "IP của Server Render đã bị TikTok chặn. Vui lòng cấu hình thêm Proxy sạch trong file server.js để vượt chặn!";
+            }
+            socket.emit('status', `Kết nối thất bại: ${userFriendlyMsg}`);
             tiktokConnect = null;
             currentRoom = null;
         }
     });
 
-    socket.on('disconnect', () => {
-        // Giữ luồng hoạt động liên tục trên Server kể cả khi có thiết bị tắt trình duyệt
-    });
+    socket.on('disconnect', () => {});
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Hệ thống chạy mượt mà tại port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Hệ thống sẵn sàng cấu hình vượt chặn tại port ${PORT}`));
