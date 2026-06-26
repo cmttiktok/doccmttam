@@ -9,6 +9,7 @@
     <style>
         :root { 
             --pink: #fe2c55; 
+            --green: #2ecc71;
             --bg: #fff0f3; 
             --panel: #ffffff; 
         }
@@ -22,6 +23,22 @@
         }
         .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; }
         
+        /* Bảng chạy chữ lời chúc / sự kiện */
+        .marquee-card {
+            background: #333; color: #fff; padding: 8px 12px; border-radius: 12px;
+            overflow: hidden; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            font-weight: bold; font-size: 14px; border: 1px solid #444;
+        }
+        .marquee-text {
+            display: inline-block; padding-left: 100%;
+            animation: marquee 15s linear infinite;
+            color: #f1c40f;
+        }
+        @keyframes marquee {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
         /* Widget Đồng hồ */
         .clock-card {
             background: linear-gradient(135deg, var(--pink), #ff6b8b);
@@ -34,8 +51,10 @@
         .card { 
             background: var(--panel); padding: 15px; border-radius: 20px; 
             border: 2px solid var(--pink); box-shadow: 0 6px 20px rgba(254,44,85,0.08);
-            text-align: center;
+            text-align: center; transition: border-color 0.3s ease;
         }
+        .card.connected-border { border-color: var(--green) !important; }
+
         input[type="text"] {
             width: 100%; padding: 14px; border-radius: 12px;
             border: 1px solid #ddd; background: #f8f9fa;
@@ -46,76 +65,56 @@
         .btn-main {
             width: 100%; padding: 14px; border: none; border-radius: 12px;
             background: var(--pink); color: white; font-weight: bold;
-            font-size: 16px; cursor: pointer; transition: 0.2s;
+            font-size: 16px; cursor: pointer; transition: background-color 0.3s, transform 0.1s;
             -webkit-tap-highlight-color: transparent;
         }
+        .btn-main.success-bg { background-color: var(--green) !important; }
         .btn-main:active { transform: scale(0.98); }
         
         .status-text { font-size: 13px; color: #666; margin-top: 8px; display: block; font-weight: 600; }
+        .status-text.success-text { color: var(--green) !important; }
         
-        /* Thanh điều khiển cỡ chữ */
+        /* Điều khiển kích cỡ chữ */
         .font-control {
             display: flex; align-items: center; justify-content: space-between;
             gap: 10px; margin-bottom: 12px; background: #fff5f7;
             padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--pink);
         }
         .font-control label { font-size: 13px; color: #555; font-weight: bold; white-space: nowrap; }
-        .font-control input[type="range"] { 
-            flex: 1; accent-color: var(--pink); cursor: pointer; height: 6px; 
-        }
+        .font-control input[type="range"] { flex: 1; accent-color: var(--pink); cursor: pointer; height: 6px; }
         
-        /* Tiêu đề khung chat và nút kích hoạt toàn màn hình */
-        .chat-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-        }
+        /* Tiêu đề khung chat */
+        .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .chat-title { margin: 0; color: var(--pink); font-size: 15px; }
-        .btn-action {
-            background: #333; color: white; border: none; padding: 6px 12px;
-            font-size: 12px; font-weight: bold; border-radius: 8px; cursor: pointer;
-        }
-        .btn-close-full {
-            background: #fe2c55; color: white; border: none; padding: 8px 16px;
-            font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; display: none;
-        }
+        .btn-action { background: #333; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .btn-close-full { background: #fe2c55; color: white; border: none; padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; display: none; }
         
-        /* Khung chatbox mượt mà */
-        .chat-box-wrapper {
-            position: relative; width: 100%;
-        }
+        /* Khung chatbox */
         .chat-box {
-            width: 100%; height: calc(100vh - 340px); min-height: 350px; max-height: 550px;
+            width: 100%; height: calc(100vh - 380px); min-height: 320px; max-height: 520px;
             background: #fff; border-radius: 15px; border: 1px solid #eee;
             padding: 12px; overflow-y: auto; text-align: left;
-            display: flex; flex-direction: column; gap: 8px; transition: all 0.2s ease-in-out;
+            display: flex; flex-direction: column; gap: 8px;
         }
         .msg { font-size: 16px; line-height: 1.4; animation: fadeIn 0.2s ease; word-break: break-word; }
         .user { color: var(--pink); font-weight: 700; margin-right: 5px; }
         .txt { color: #333; }
         
-        /* ========================================== */
-        /* CSS CHẾ ĐỘ TOÀN MÀN HÌNH ẢO CHO MOBILE */
-        /* ========================================== */
-        body.fullscreen-mode {
-            overflow: hidden; padding: 0;
-        }
-        body.fullscreen-mode .container > *:not(.card-chat-area) {
-            display: none !important; /* Ẩn hết đồng hồ và ô kết nối */
-        }
-        body.fullscreen-mode .container {
-            max-width: 100vw; height: 100vh; gap: 0;
-        }
+        /* TOÀN MÀN HÌNH ẢO CHO MOBILE - FIX LỖI CUỘN ĐẨY CMT */
+        body.fullscreen-mode { overflow: hidden; padding: 0; }
+        body.fullscreen-mode .container > *:not(.card-chat-area) { display: none !important; }
+        body.fullscreen-mode .container { max-width: 100vw; height: 100vh; gap: 0; }
         body.fullscreen-mode .card-chat-area {
             border: none !important; border-radius: 0 !important;
             width: 100vw !important; height: 100vh !important;
             padding: 12px !important; display: flex; flex-direction: column;
         }
         body.fullscreen-mode .chat-box {
-            flex: 1 !important; height: auto !important; max-height: none !important;
+            flex: 1 !important; height: auto !important; max-height: none !important; min-height: 0 !important;
             border-radius: 10px !important; margin-bottom: 5px;
         }
         body.fullscreen-mode .btn-action { display: none; }
         body.fullscreen-mode .btn-close-full { display: block; }
-        /* ========================================== */
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(4px); }
@@ -126,18 +125,22 @@
 <body>
 
     <div class="container">
+        <div class="marquee-card">
+            <div class="marquee-text" id="marqueeText">Chúc bé chi live tốt!</div>
+        </div>
+
         <div class="clock-card">
             <div id="digitalClock">00:00:00</div>
             <div id="digitalDate">Thứ ..., Ngày --/--/----</div>
         </div>
 
-        <div class="card">
+        <div class="card" id="connectCard">
             <input type="text" id="username" value="chipham1" placeholder="Nhập tên tài khoản TikTok Live">
             <button class="btn-main" id="btnConnect">KẾT NỐI LIVE</button>
             <span class="status-text" id="status">Chưa kết nối</span>
         </div>
 
-        <div class="card card-chat-area" style="padding: 12px;">
+        <div class="card card-chat-area" id="chatCard" style="padding: 12px;">
             <div class="chat-header">
                 <h3 class="chat-title">💬 BÌNH LUẬN TRỰC TIẾP</h3>
                 <button id="btnFullscreen" class="btn-action">📺 TOÀN MÀN HÌNH</button>
@@ -149,9 +152,7 @@
                 <input type="range" id="fontSizeSlider" min="14" max="28" value="16">
             </div>
 
-            <div class="chat-box-wrapper">
-                <div class="chat-box" id="chatBox"></div>
-            </div>
+            <div class="chat-box" id="chatBox"></div>
         </div>
     </div>
 
@@ -161,16 +162,18 @@
         const usernameInput = document.getElementById('username');
         const statusText = document.getElementById('status');
         const chatBox = document.getElementById('chatBox');
+        const connectCard = document.getElementById('connectCard');
+        const chatCard = document.getElementById('chatCard');
         
         const fontSizeSlider = document.getElementById('fontSizeSlider');
         const fontSizeVal = document.getElementById('fontSizeVal');
         const btnFullscreen = document.getElementById('btnFullscreen');
         const btnCloseFullscreen = document.getElementById('btnCloseFullscreen');
+        const marqueeText = document.getElementById('marqueeText');
         
         let currentFontSize = 16;
         let wakeLock = null;
 
-        // 1. Logic Đồng hồ tự động cập nhật
         function updateClock() {
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
@@ -180,44 +183,24 @@
 
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayName = days[now.getDay()];
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-            document.getElementById('digitalDate').innerText = `${dayName}, Ngày ${day}/${month}/${year}`;
+            document.getElementById('digitalDate').innerText = `${dayName}, Ngày ${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
         }
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. Thanh trượt điều chỉnh kích thước chữ
         fontSizeSlider.oninput = (e) => {
             currentFontSize = e.target.value;
             fontSizeVal.innerText = currentFontSize;
-            
             const messages = chatBox.getElementsByClassName('msg');
-            for(let msg of messages) {
-                msg.style.fontSize = currentFontSize + 'px';
-            }
+            for(let msg of messages) { msg.style.fontSize = currentFontSize + 'px'; }
         };
 
-        // 3. Giữ màn hình luôn sáng (Wake Lock API)
         async function requestWakeLock() {
             if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Màn hình đang được giữ sáng chủ động...');
-                } catch (err) {
-                    console.warn(`WakeLock lỗi: ${err.message}`);
-                }
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
             }
         }
 
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
-        });
-
-        // 4. Xử lý chế độ Toàn màn hình ảo (Virtual Fullscreen) chuẩn Mobile
         btnFullscreen.onclick = () => {
             document.body.classList.add('fullscreen-mode');
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -228,7 +211,6 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         };
 
-        // 5. Logic Xử lý sự kiện chính
         btnConnect.onclick = async () => {
             const user = usernameInput.value.trim();
             if(!user) return alert('Vui lòng nhập ID!');
@@ -236,8 +218,27 @@
             await requestWakeLock();
         };
 
-        socket.on('status', (msg) => {
-            statusText.innerText = msg;
+        socket.on('update-event', (text) => {
+            if (text && text.trim() !== "") {
+                marqueeText.innerText = text;
+            } else {
+                marqueeText.innerText = "Chúc bé chi live tốt!";
+            }
+        });
+
+        socket.on('status', (data) => {
+            statusText.innerText = data.msg;
+            if (data.success) {
+                btnConnect.classList.add('success-bg');
+                statusText.classList.add('success-text');
+                connectCard.classList.add('connected-border');
+                chatCard.classList.add('connected-border');
+            } else {
+                btnConnect.classList.remove('success-bg');
+                statusText.classList.remove('success-text');
+                connectCard.classList.remove('connected-border');
+                chatCard.classList.remove('connected-border');
+            }
         });
 
         socket.on('comment-data', (data) => {
@@ -246,7 +247,6 @@
             msgDiv.style.fontSize = currentFontSize + 'px';
             msgDiv.innerHTML = `<span class="user">${data.user}:</span><span class="txt">${data.comment}</span>`;
             chatBox.appendChild(msgDiv);
-            
             chatBox.scrollTop = chatBox.scrollHeight;
         });
     </script>
